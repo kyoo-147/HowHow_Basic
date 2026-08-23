@@ -1,6 +1,6 @@
 # HowHow Basic status
 
-Updated 2026-08-23 after strict evidence-descriptor and experiment integrity validation.
+Updated 2026-08-23 after strict verification of every retained experiment record.
 
 ## Evidence-backed completion
 
@@ -12,7 +12,7 @@ Updated 2026-08-23 after strict evidence-descriptor and experiment integrity val
 | Plans, human gate, checkpoints, append-only events | VERIFIED_LIVE | `projects/claimledger/.howhow/events.jsonl`; human continuation returned `NEEDS_HUMAN` and accepted an explicit response |
 | Source registry and safe cached retrieval | VERIFIED_LIVE | local CC0 fixture plus official OpenAlex REST response, raw payload hashes and manifests |
 | Exact evidence spans and audit | VERIFIED_LIVE | `ev-corpus-span-1`, strict audit passed; descriptor hashes and referenced experiment contents are revalidated, with negative span/claim/run-binding tests |
-| Experiment records and preserved failure | VERIFIED_LIVE | deterministic CPU benchmark success plus `claimledger-benchmark-failed-001` and failure log |
+| Experiment records and preserved failure | VERIFIED_LIVE | deterministic CPU benchmark success plus `claimledger-benchmark-failed-001` and failure log; strict verification revalidates every record hash, filename/id binding, required field, and status payload |
 | Research scaffold and role prompts | VERIFIED_DETERMINISTIC | `.pi/skills/howhow-basic`, `.pi/agents`, `schemas`, project layout |
 | LaTeX build and source package | VERIFIED_LIVE | MiKTeX `pdflatex`/`bibtex`, 4-page `dist/paper.pdf`, `dist/arxiv-source.tar.gz` |
 | Record-driven render/finalization gate | VERIFIED_LIVE | `paper render` emits `paper/howhow_records.tex`; `paper finalize` strictly audits records, builds LaTeX, validates archive extraction, then records `COMPLETE` |
@@ -36,7 +36,7 @@ Topic: **ClaimLedger: a CPU-only controlled benchmark for detecting stale eviden
 Commands run successfully:
 
 ```text
-python -m unittest discover -s tests -v                         # exit 0, 11 tests
+python -m unittest discover -s tests -v                         # exit 0, 13 tests
 python -m py_compile howhow/*.py                                # exit 0
 python -m howhow source add data/corpus.txt --license CC0         # exit 0
 python -m howhow source add https://api.openalex.org/...         # exit 0, live official metadata retrieval
@@ -60,4 +60,4 @@ The final exact product verdict is `READY_FOR_HUMAN_REVIEW`. It means the determ
 - Crossref and Semantic Scholar adapters, rebuild verification, and full claim-linter coverage are future work. Source archive extraction/hash validation is now part of finalization.
 - The experiment uses one short local fixture, one mutation, and one repetition; timing is descriptive only.
 
-Independent immutable review records are implemented with claim/evidence binding, strict hash-chain audit, and repeat validation of retained source spans and experiment records. They record human findings but do not decide correctness, novelty, or publication.
+Independent immutable review records are implemented with claim/evidence binding, strict hash-chain audit, and repeat validation of retained source spans and experiment records. Every retained experiment, including unlinked failures and inconclusive results, is independently hash- and schema-checked by project verification. These gates record integrity, not correctness, novelty, or publication readiness.

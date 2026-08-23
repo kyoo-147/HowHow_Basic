@@ -87,6 +87,79 @@ class HowHowProductTests(unittest.TestCase):
         run_path.write_text(json.dumps(run), encoding="utf-8")
         self.assertTrue(any("experiment integrity check failed" in issue for issue in audit_evidence(self.root, strict=True)["issues"]))
 
+    def test_verify_project_revalidates_all_experiment_records(self):
+        from unittest.mock import patch
+        from howhow.core import canonical, sha256_bytes, verify_project
+
+        descriptors = {
+            "failed-unlinked": {
+                "status": "FAILED", "raw_observations": [], "metrics": {},
+                "error": "bounded command exited 1",
+            },
+            "success-unlinked": {
+                "status": "SUCCESS", "raw_observations": [{"ok": True}], "metrics": {"count": 1},
+            },
+            "inconclusive-unlinked": {
+                "status": "INCONCLUSIVE", "raw_observations": [{"signal": "ambiguous"}], "metrics": {"count": 1},
+            },
+        }
+        for run_id, payload in descriptors.items():
+            descriptor = self.tmp / f"{run_id}.json"
+            descriptor.write_text(json.dumps({
+                "id": run_id, "hypothesis": "fixture", "command": ["fixture"],
+                "code_revision": "fixture", "seed": 1, **payload,
+            }), encoding="utf-8")
+            record_experiment(self.root, descriptor)
+
+        with patch("howhow.core.build_paper", return_value={"passed": True}), patch(
+            "howhow.core.package_paper", return_value={"files": [{"path": "fixture"}], "validation": {"passed": True}}
+        ):
+            for run_id in descriptors:
+                path = self.root / ".howhow/experiments" / f"{run_id}.json"
+                original = path.read_bytes()
+                record = json.loads(original)
+                record["hypothesis"] = "tampered after recording"
+                path.write_text(json.dumps(record), encoding="utf-8")
+                report = verify_project(self.root)
+                check = next(item for item in report["checks"] if item["name"] == "experiments")
+                self.assertFalse(check["passed"], run_id)
+                self.assertIn("record hash mismatch", check["detail"])
+                path.write_bytes(original)
+
+            contract_mutations = {
+                "failed-unlinked": lambda record: record.pop("error"),
+                "success-unlinked": lambda record: record.update(raw_observations=[]),
+                "inconclusive-unlinked": lambda record: record.update(metrics={}),
+            }
+            for run_id, mutate in contract_mutations.items():
+                path = self.root / ".howhow/experiments" / f"{run_id}.json"
+                original = path.read_bytes()
+                record = json.loads(original)
+                mutate(record)
+                record.pop("record_sha256")
+                record["record_sha256"] = sha256_bytes(canonical(record))
+                path.write_text(json.dumps(record), encoding="utf-8")
+                report = verify_project(self.root)
+                check = next(item for item in report["checks"] if item["name"] == "experiments")
+                self.assertFalse(check["passed"], run_id)
+                path.write_bytes(original)
+
+            path = self.root / ".howhow/experiments/success-unlinked.json"
+            path = self.root / ".howhow/experiments/success-unlinked.json"
+            record = json.loads(path.read_text(encoding="utf-8"))
+            record["id"] = "different-id"
+            record["raw_observations"] = []
+            record.pop("record_sha256")
+            record["record_sha256"] = sha256_bytes(canonical(record))
+            path.write_text(json.dumps(record), encoding="utf-8")
+            report = verify_project(self.root)
+            check = next(item for item in report["checks"] if item["name"] == "experiments")
+            self.assertFalse(check["passed"])
+            self.assertIn("filename id success-unlinked does not match record id different-id", check["detail"])
+            self.assertIn("SUCCESS requires raw observations and metrics", check["detail"])
+            with self.assertRaises(SystemExit):
+                verify_project(self.root, strict=True)
+
     def test_source_pin_and_read_only_use(self):
         from howhow.core import source_inspect, source_pin, source_use
         source = self.tmp / "pinned.txt"

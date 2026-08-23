@@ -412,10 +412,53 @@ def audit_evidence(root: Path, strict: bool = False) -> dict[str, Any]:
     return result
 
 
+EXPERIMENT_REQUIRED_FIELDS = ("id", "hypothesis", "command", "status", "raw_observations", "metrics", "code_revision", "seed")
+
+
+def experiment_record_issues(record: Any, expected_id: str | None = None) -> list[str]:
+    """Return deterministic validation failures for a retained experiment record."""
+    if not isinstance(record, dict):
+        return ["record is not a JSON object"]
+    issues: list[str] = []
+    missing = [key for key in EXPERIMENT_REQUIRED_FIELDS if key not in record]
+    if missing:
+        issues.append("missing required fields: " + ", ".join(missing))
+    experiment_id = record.get("id")
+    try:
+        safe_id(experiment_id, "experiment id")
+    except SystemExit as exc:
+        issues.append(str(exc))
+    if expected_id is not None and experiment_id != expected_id:
+        issues.append(f"filename id {expected_id} does not match record id {experiment_id}")
+    status = record.get("status")
+    if status not in {"SUCCESS", "FAILED", "INCONCLUSIVE"}:
+        issues.append("invalid status")
+    if not isinstance(record.get("hypothesis"), str) or not record.get("hypothesis", "").strip():
+        issues.append("hypothesis must be a non-empty string")
+    command = record.get("command")
+    if not isinstance(command, list) or not command or not all(isinstance(part, str) and part for part in command):
+        issues.append("command must be a non-empty array of strings")
+    if not isinstance(record.get("code_revision"), str) or not record.get("code_revision", "").strip():
+        issues.append("code_revision must be a non-empty string")
+    observations, metrics = record.get("raw_observations"), record.get("metrics")
+    if not isinstance(observations, list):
+        issues.append("raw_observations must be an array")
+    if not isinstance(metrics, dict):
+        issues.append("metrics must be an object")
+    if status in {"SUCCESS", "INCONCLUSIVE"} and (not observations or not metrics):
+        issues.append(f"{status} requires raw observations and metrics")
+    if status == "FAILED" and (not isinstance(record.get("error"), str) or not record.get("error", "").strip()):
+        issues.append("FAILED requires a non-empty error")
+    digest, unsigned = record.get("record_sha256"), dict(record)
+    unsigned.pop("record_sha256", None)
+    if not digest or digest != sha256_bytes(canonical(unsigned)):
+        issues.append("record hash mismatch")
+    return issues
+
+
 def record_experiment(root: Path, descriptor: Path) -> dict[str, Any]:
     record = read_json(descriptor)
-    required = ["id", "hypothesis", "command", "status", "raw_observations", "metrics", "code_revision", "seed"]
-    missing = [key for key in required if key not in record]
+    missing = [key for key in EXPERIMENT_REQUIRED_FIELDS if key not in record]
     if missing:
         raise SystemExit("experiment record missing: " + ", ".join(missing))
     if record["status"] not in {"SUCCESS", "FAILED", "INCONCLUSIVE"}:
@@ -424,6 +467,9 @@ def record_experiment(root: Path, descriptor: Path) -> dict[str, Any]:
     record["schema_version"] = SCHEMA_VERSION
     record["recorded_at"] = record.get("recorded_at", now())
     record["record_sha256"] = sha256_bytes(canonical(record))
+    issues = experiment_record_issues(record, record["id"])
+    if issues:
+        raise SystemExit("invalid experiment record: " + "; ".join(issues))
     target = root / ".howhow/experiments" / f"{record['id']}.json"
     if target.exists():
         raise SystemExit("experiment records are immutable; use a new id")
@@ -694,14 +740,19 @@ def verify_project(root: Path, strict: bool = False, profile: str = "project") -
     from .reviews import audit as audit_reviews
     review_result = audit_reviews(root, strict=strict)
     check("reviews", review_result["passed"], f"{review_result['records']} immutable review records, {len(review_result['issues'])} issues")
-    experiments = list((root / ".howhow/experiments").glob("*.json"))
-    exp_ok = True
+    experiments = sorted((root / ".howhow/experiments").glob("*.json"))
+    experiment_issues: list[str] = []
     for path in experiments:
-        record = read_json(path)
-        valid_status = record.get("status") in {"SUCCESS", "FAILED", "INCONCLUSIVE"}
-        has_payload = bool(record.get("raw_observations")) and bool(record.get("metrics"))
-        exp_ok = exp_ok and valid_status and (has_payload or record.get("status") == "FAILED")
-    check("experiments", bool(experiments) and exp_ok, f"{len(experiments)} immutable experiment records")
+        try:
+            record = read_json(path)
+        except (OSError, ValueError) as exc:
+            experiment_issues.append(f"{path.name}: unreadable record ({type(exc).__name__})")
+            continue
+        experiment_issues.extend(f"{path.name}: {issue}" for issue in experiment_record_issues(record, path.stem))
+    experiment_detail = f"{len(experiments)} immutable experiment records, {len(experiment_issues)} issues"
+    if experiment_issues:
+        experiment_detail += ": " + "; ".join(experiment_issues)
+    check("experiments", bool(experiments) and not experiment_issues, experiment_detail)
     paper_result = build_paper(root, strict=False)
     check("latex", paper_result["passed"], paper_result.get("error", paper_result.get("pdf", "")))
     package = package_paper(root, strict=False) if paper_result["passed"] else {"files": []}
