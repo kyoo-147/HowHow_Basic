@@ -29,6 +29,38 @@ class CliIntegrationTests(unittest.TestCase):
         run_in_project("resume")
         self.assertTrue((root / ".howhow/events.jsonl").exists())
 
+    @unittest.skipUnless(__import__("shutil").which("pdflatex") and __import__("shutil").which("bibtex"), "LaTeX toolchain required")
+    def test_claimledger_full_finalization_rebuilds_source_package(self):
+        import shutil
+
+        repository = Path(__file__).resolve().parents[1]
+        source = repository / "projects/claimledger"
+        root = Path(tempfile.mkdtemp()) / "claimledger"
+        shutil.copytree(source, root)
+        shutil.rmtree(root / ".howhow/builds", ignore_errors=True)
+        shutil.rmtree(root / ".howhow/verify", ignore_errors=True)
+        shutil.rmtree(root / "dist", ignore_errors=True)
+        (root / ".howhow/builds").mkdir(parents=True)
+        (root / ".howhow/verify").mkdir(parents=True)
+        (root / "dist").mkdir(parents=True)
+        state_path = root / ".howhow/state.json"
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        state.update({"state": "READY", "paused": False, "current_task": None})
+        state_path.write_text(json.dumps(state), encoding="utf-8")
+        env = os.environ.copy()
+        env["PYTHONPATH"] = str(repository)
+        proc = subprocess.run(
+            [sys.executable, "-m", "howhow", "paper", "finalize"],
+            cwd=root, env=env, text=True, capture_output=True, timeout=300,
+        )
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        result = json.loads(proc.stdout)
+        self.assertEqual(result["state"], "READY_FOR_HUMAN_REVIEW")
+        manifest = json.loads((root / "dist/source-manifest.json").read_text(encoding="utf-8"))
+        self.assertTrue(manifest["validation"]["clean_room_rebuild"]["passed"])
+        self.assertTrue((root / "dist/paper.pdf").is_file())
+        self.assertTrue((root / "dist/arxiv-source.tar.gz").is_file())
+
 
 if __name__ == "__main__":
     unittest.main()

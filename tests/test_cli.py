@@ -287,6 +287,58 @@ class HowHowProductTests(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 __import__("howhow.core", fromlist=["verify_project"]).verify_project(self.root, strict=True)
 
+    def test_package_validation_rebuilds_only_extracted_verified_files(self):
+        import tarfile
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from howhow.core import sha256_bytes, validate_package
+
+        files = {
+            "main.tex": b"\\documentclass{article}\\begin{document}ok\\end{document}\n",
+            "references.bib": b"",
+        }
+        archive = self.root / "dist/arxiv-source.tar.gz"
+        staging = self.tmp / "package-staging"
+        staging.mkdir()
+        with tarfile.open(archive, "w:gz") as tar:
+            for name, data in files.items():
+                path = staging / name
+                path.write_bytes(data)
+                tar.add(path, arcname=name, recursive=False)
+        manifest = {"files": [{"path": name, "bytes": len(data), "sha256": sha256_bytes(data)} for name, data in files.items()]}
+        invoked = []
+
+        def fake_run(command, cwd, **kwargs):
+            invoked.append((command, Path(cwd)))
+            self.assertNotEqual(Path(cwd), self.root)
+            (Path(cwd) / "main.pdf").write_bytes(b"%PDF fixture")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        with patch("howhow.core._tool", return_value="pdflatex"), patch("howhow.core.subprocess.run", side_effect=fake_run):
+            result = validate_package(self.root, manifest)
+        self.assertTrue(result["passed"])
+        self.assertTrue(result["clean_room_rebuild"]["passed"])
+        self.assertEqual(len(invoked), 1)
+
+    def test_package_validation_fails_when_clean_room_compile_fails(self):
+        import tarfile
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from howhow.core import sha256_bytes, validate_package
+
+        data = b"\\documentclass{article}\\begin{document}broken\\end{document}\n"
+        archive = self.root / "dist/arxiv-source.tar.gz"
+        source = self.tmp / "main.tex"
+        source.write_bytes(data)
+        with tarfile.open(archive, "w:gz") as tar:
+            tar.add(source, arcname="main.tex", recursive=False)
+        manifest = {"files": [{"path": "main.tex", "bytes": len(data), "sha256": sha256_bytes(data)}]}
+        failed = SimpleNamespace(returncode=1, stdout="compile error\n", stderr="")
+        with patch("howhow.core._tool", return_value="pdflatex"), patch("howhow.core.subprocess.run", return_value=failed):
+            result = validate_package(self.root, manifest)
+        self.assertFalse(result["passed"])
+        self.assertIn("clean-room rebuild failed: compile error", result["issues"])
+
     def test_continue_blocks_without_strict_verification(self):
         plan = self.tmp / "empty-plan.json"
         plan.write_text(json.dumps({"objective": "x", "tasks": []}), encoding="utf-8")

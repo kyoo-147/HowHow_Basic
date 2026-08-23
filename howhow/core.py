@@ -670,31 +670,71 @@ def build_paper(root: Path, strict: bool = False) -> dict[str, Any]:
     return result
 
 
+def _rebuild_extracted_package(extracted: Path) -> dict[str, Any]:
+    """Compile an extracted source package without trusting the working tree."""
+    tex = extracted / "main.tex"
+    if not tex.is_file():
+        return {"passed": False, "commands": [], "error": "main.tex is missing from extracted package"}
+    pdflatex = _tool("pdflatex")
+    if not pdflatex:
+        return {"passed": False, "commands": [], "error": "pdflatex not installed for clean-room rebuild"}
+    tex_text = tex.read_text(encoding="utf-8")
+    commands = [[pdflatex, "-no-shell-escape", "-interaction=nonstopmode", "-halt-on-error", "main.tex"]]
+    if "\\bibliography{" in tex_text:
+        bibtex = _tool("bibtex")
+        if not bibtex:
+            return {"passed": False, "commands": commands, "error": "bibtex not installed for clean-room rebuild"}
+        commands += [[bibtex, "main"], commands[0], commands[0]]
+    for command in commands:
+        try:
+            proc = subprocess.run(command, cwd=extracted, text=True, capture_output=True, timeout=120)
+        except (OSError, subprocess.SubprocessError) as exc:
+            return {"passed": False, "commands": commands, "error": f"clean-room rebuild failed: {exc}"}
+        if proc.returncode != 0:
+            detail = (proc.stderr or proc.stdout or "compiler exited nonzero").strip().splitlines()
+            return {"passed": False, "commands": commands, "error": "clean-room rebuild failed: " + (detail[-1] if detail else "compiler exited nonzero")}
+    pdf = extracted / "main.pdf"
+    if not pdf.is_file():
+        return {"passed": False, "commands": commands, "error": "clean-room rebuild did not produce main.pdf"}
+    return {"passed": True, "commands": commands, "pdf_sha256": sha256_file(pdf), "error": None}
+
+
 def validate_package(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
     archive = root / "dist/arxiv-source.tar.gz"
     issues: list[str] = []
     expected = {item["path"]: item for item in manifest.get("files", [])}
     seen: set[str] = set()
+    rebuild: dict[str, Any] = {"passed": False, "commands": [], "error": "archive integrity validation failed"}
     try:
-        with tarfile.open(archive, "r:gz") as tar:
-            for member in tar.getmembers():
-                path = PurePosixPath(member.name)
-                if not member.isreg() or path.is_absolute() or ".." in path.parts:
-                    issues.append(f"unsafe archive member: {member.name}")
-                    continue
-                if member.name in seen or member.name not in expected:
-                    issues.append(f"unexpected archive member: {member.name}")
-                    continue
-                seen.add(member.name)
-                extracted = tar.extractfile(member)
-                data = extracted.read() if extracted else b""
-                item = expected[member.name]
-                if len(data) != item["bytes"] or sha256_bytes(data) != item["sha256"]:
-                    issues.append(f"archive hash mismatch: {member.name}")
+        with tempfile.TemporaryDirectory(prefix="howhow-package-") as temporary:
+            extracted_root = Path(temporary)
+            with tarfile.open(archive, "r:gz") as tar:
+                for member in tar.getmembers():
+                    path = PurePosixPath(member.name)
+                    if not member.isreg() or path.is_absolute() or ".." in path.parts or "\\" in member.name or (path.parts and ":" in path.parts[0]):
+                        issues.append(f"unsafe archive member: {member.name}")
+                        continue
+                    if member.name in seen or member.name not in expected:
+                        issues.append(f"unexpected archive member: {member.name}")
+                        continue
+                    seen.add(member.name)
+                    source = tar.extractfile(member)
+                    data = source.read() if source else b""
+                    item = expected[member.name]
+                    if len(data) != item["bytes"] or sha256_bytes(data) != item["sha256"]:
+                        issues.append(f"archive hash mismatch: {member.name}")
+                        continue
+                    destination = extracted_root.joinpath(*path.parts)
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    destination.write_bytes(data)
+            issues.extend(f"missing archive member: {path}" for path in sorted(set(expected) - seen))
+            if not issues:
+                rebuild = _rebuild_extracted_package(extracted_root)
+                if not rebuild["passed"]:
+                    issues.append(rebuild["error"])
     except (OSError, tarfile.TarError) as exc:
         issues.append(f"archive unreadable: {exc}")
-    issues.extend(f"missing archive member: {path}" for path in sorted(set(expected) - seen))
-    return {"passed": not issues, "issues": issues, "file_count": len(seen)}
+    return {"passed": not issues, "issues": issues, "file_count": len(seen), "clean_room_rebuild": rebuild}
 
 
 def package_paper(root: Path, strict: bool = False) -> dict[str, Any]:
