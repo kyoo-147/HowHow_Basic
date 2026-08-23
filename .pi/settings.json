@@ -5,6 +5,14 @@
   "subagents": {
     "defaultModel": "openai-codex/gpt-5.6-luna",
     "defaultThinking": "medium",
+    "agentOverrides": {
+      "delegate": { "thinking": "medium" },
+      "oracle": { "thinking": "medium" },
+      "researcher": { "thinking": "medium" },
+      "reviewer": { "thinking": "medium" },
+      "scout": { "thinking": "medium" },
+      "worker": { "thinking": "medium" }
+    },
     "modelScope": {
       "enforce": true,
       "allow": ["openai-codex/gpt-5.6-luna"]

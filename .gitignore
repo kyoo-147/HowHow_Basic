@@ -9,3 +9,6 @@ __pycache__/
 *.fdb_latexmk
 *.synctex.gz
 nul
+
+# Local Pi subagent runtime state (schedules, missions, run receipts)
+.pi/subagents/
