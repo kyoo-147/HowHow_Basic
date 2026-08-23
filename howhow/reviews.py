@@ -10,6 +10,55 @@ SEVERITIES = {"BLOCKING", "MAJOR", "MINOR", "DISSENT"}
 def records(root: Path) -> list[dict[str, Any]]:
     return [read_json(p) for p in sorted((root / ".howhow/reviews").glob("*.json")) if p.parent.name == "reviews"]
 
+def _source_binding_issue(root: Path, record: dict[str, Any]) -> str | None:
+    source_id = record.get("source_id")
+    try:
+        safe_id(source_id, "source id")
+        manifest = source_inspect(root, source_id)
+    except SystemExit as exc:
+        return str(exc)
+    except (OSError, TypeError, ValueError):
+        return f"source record unreadable for source_id {source_id}"
+    locator = record.get("locator")
+    if not isinstance(locator, dict) or type(locator.get("char_start")) is not int or type(locator.get("char_end")) is not int:
+        return "source-bound review requires exact char_start and char_end"
+    payload = root / ".howhow/sources/raw" / source_id / "payload"
+    try:
+        if not payload.is_file() or sha256_file(payload) != manifest.get("sha256"):
+            return "source bytes failed integrity check"
+        text = payload.read_bytes().decode("utf-8", errors="replace")
+    except OSError:
+        return "source bytes failed integrity check"
+    start, end = locator["char_start"], locator["char_end"]
+    if not (0 <= start <= end <= len(text)) or text[start:end] != record.get("quote", ""):
+        return "review source span does not match retained source bytes"
+    return None
+
+
+def _run_binding_issue(root: Path, record: dict[str, Any]) -> str | None:
+    run_id = record.get("run_id")
+    try:
+        safe_id(run_id, "run id")
+    except SystemExit as exc:
+        return str(exc)
+    path = root / ".howhow/experiments" / f"{run_id}.json"
+    if not path.exists():
+        return f"unknown run_id {run_id}"
+    try:
+        run = read_json(path)
+    except (OSError, ValueError):
+        return f"experiment record unreadable for run_id {run_id}"
+    if not isinstance(run, dict):
+        return f"experiment record unreadable for run_id {run_id}"
+    if run.get("id") != run_id:
+        return f"run_id {run_id} does not match retained experiment"
+    digest, unsigned = run.get("record_sha256"), dict(run)
+    unsigned.pop("record_sha256", None)
+    if not digest or digest != sha256_bytes(canonical(unsigned)):
+        return f"experiment integrity check failed for run_id {run_id}"
+    return None
+
+
 def add(root: Path, descriptor: Path) -> dict[str, Any]:
     record = read_json(descriptor)
     required = ["id", "reviewer", "finding", "severity"]
@@ -23,16 +72,11 @@ def add(root: Path, descriptor: Path) -> dict[str, Any]:
     source_bound, run_bound = bool(record.get("source_id")), bool(record.get("run_id"))
     if not source_bound and not run_bound: raise SystemExit("review record requires source span and/or experiment run")
     if source_bound:
-        manifest = source_inspect(root, record["source_id"])
-        locator = record.get("locator")
-        if not isinstance(locator, dict) or type(locator.get("char_start")) is not int or type(locator.get("char_end")) is not int: raise SystemExit("source-bound review requires exact char_start and char_end")
-        payload = root / ".howhow/sources/raw" / record["source_id"] / "payload"
-        if not payload.exists() or sha256_file(payload) != manifest["sha256"]: raise SystemExit("source bytes failed integrity check")
-        text = payload.read_bytes().decode("utf-8", errors="replace")
-        if not (0 <= locator["char_start"] <= locator["char_end"] <= len(text)) or text[locator["char_start"]:locator["char_end"]] != record.get("quote", ""): raise SystemExit("review source span does not match retained source bytes")
+        issue = _source_binding_issue(root, record)
+        if issue: raise SystemExit(issue)
     if run_bound:
-        safe_id(record["run_id"], "run id")
-        if not (root / ".howhow/experiments" / f"{record['run_id']}.json").exists(): raise SystemExit(f"unknown run_id {record['run_id']}")
+        issue = _run_binding_issue(root, record)
+        if issue: raise SystemExit(issue)
     record["schema_version"], record["created_at"] = SCHEMA_VERSION, record.get("created_at", now())
     target = root / ".howhow/reviews" / f"{record['id']}.json"
     if target.exists(): raise SystemExit("review records are immutable; use a new id")
@@ -53,6 +97,12 @@ def audit(root: Path, strict: bool = False) -> dict[str, Any]:
         if record.get("severity") not in SEVERITIES: issues.append(f"{record.get('id')}: invalid severity")
         if not record.get("claim_id") and not record.get("claim"): issues.append(f"{record.get('id')}: missing claim binding")
         if not record.get("source_id") and not record.get("run_id"): issues.append(f"{record.get('id')}: missing evidence binding")
+        if record.get("source_id"):
+            issue = _source_binding_issue(root, record)
+            if issue: issues.append(f"{record.get('id')}: {issue}")
+        if record.get("run_id"):
+            issue = _run_binding_issue(root, record)
+            if issue: issues.append(f"{record.get('id')}: {issue}")
         previous = digest or ""
     result = {"schema_version": SCHEMA_VERSION, "records": len(items), "issues": issues, "passed": not issues}
     audit_id = "review-audit-" + uuid.uuid4().hex[:16]

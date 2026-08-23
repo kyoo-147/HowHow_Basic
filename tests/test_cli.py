@@ -103,6 +103,45 @@ class HowHowProductTests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             add(self.root, descriptor)
 
+    def test_review_audit_revalidates_source_and_run_bindings(self):
+        from howhow.reviews import add, audit
+        source = self.tmp / "review-target-source.txt"
+        source.write_text("Bound review target.\n", encoding="utf-8")
+        manifest = source_add(self.root, str(source), "CC0")
+        run_descriptor = self.tmp / "review-target-run.json"
+        run_descriptor.write_text(json.dumps({
+            "id": "review-target-run", "hypothesis": "fixture", "command": ["fixture"],
+            "status": "SUCCESS", "raw_observations": [{"ok": True}], "metrics": {"count": 1},
+            "code_revision": "fixture", "seed": 1,
+        }), encoding="utf-8")
+        record_experiment(self.root, run_descriptor)
+        review_descriptor = self.tmp / "review-target.json"
+        review_descriptor.write_text(json.dumps({
+            "id": "review-target", "reviewer": "human-1", "finding": "Check retained targets",
+            "severity": "MAJOR", "claim": "Bound target", "source_id": manifest["source_id"],
+            "locator": {"char_start": 0, "char_end": 20}, "quote": "Bound review target.",
+            "run_id": "review-target-run",
+        }), encoding="utf-8")
+        add(self.root, review_descriptor)
+        self.assertTrue(audit(self.root, strict=True)["passed"])
+
+        payload = self.root / ".howhow/sources/raw" / manifest["source_id"] / "payload"
+        original_payload = payload.read_bytes()
+        payload.write_text("mutated", encoding="utf-8")
+        self.assertIn("source bytes failed integrity check", audit(self.root)["issues"][0])
+        payload.write_bytes(original_payload)
+
+        run_path = self.root / ".howhow/experiments/review-target-run.json"
+        original_run = run_path.read_bytes()
+        run_path.unlink()
+        self.assertTrue(any("unknown run_id review-target-run" in issue for issue in audit(self.root)["issues"]))
+        run_path.write_bytes(original_run)
+        run = json.loads(run_path.read_text(encoding="utf-8"))
+        run["metrics"] = {"count": 2}
+        run_path.write_text(json.dumps(run), encoding="utf-8")
+        self.assertTrue(any("experiment integrity check failed" in issue for issue in audit(self.root)["issues"]))
+        self.assertFalse(audit(self.root, strict=True)["passed"])
+
     def test_verify_project_audits_immutable_reviews(self):
         from unittest.mock import patch
         from howhow.reviews import add

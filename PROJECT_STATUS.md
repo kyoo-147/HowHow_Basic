@@ -1,10 +1,10 @@
 # HowHow Basic status
 
-Updated 2026-08-23 after strict project verification and immutable-review gate integration.
+Updated 2026-08-23 after strict review-target integrity validation.
 
 ## Evidence-backed completion
 
-**Overall MVP completion: 92% (implemented product and deterministic/local acceptance).** This percentage is a capability estimate, not scientific acceptance. Against the broader autonomous research-to-LaTeX acceptance, the product remains partial because task execution and scientific review are intentionally human-owned.
+**Overall MVP completion: 93% (implemented product and deterministic/local acceptance).** This percentage is a capability estimate, not scientific acceptance. Against the broader autonomous research-to-LaTeX acceptance, the product remains partial because task execution and scientific review are intentionally human-owned.
 
 | Capability | Status | Evidence |
 |---|---|---|
@@ -16,7 +16,7 @@ Updated 2026-08-23 after strict project verification and immutable-review gate i
 | Research scaffold and role prompts | VERIFIED_DETERMINISTIC | `.pi/skills/howhow-basic`, `.pi/agents`, `schemas`, project layout |
 | LaTeX build and source package | VERIFIED_LIVE | MiKTeX `pdflatex`/`bibtex`, 4-page `dist/paper.pdf`, `dist/arxiv-source.tar.gz` |
 | Record-driven render/finalization gate | VERIFIED_LIVE | `paper render` emits `paper/howhow_records.tex`; `paper finalize` strictly audits records, builds LaTeX, validates archive extraction, then records `COMPLETE` |
-| Claims/reviews/gates and truthful readiness | PARTIAL | claim map and machine review report exist; strict verification now audits immutable review hash chains; no human scientific review, novelty decision, or external submission |
+| Claims/reviews/gates and truthful readiness | PARTIAL | claim map and machine review report exist; strict verification audits immutable review hash chains and revalidates retained source spans and experiment integrity; no human scientific review, novelty decision, or external submission |
 | Parallel Pi-subagent waves | PARTIAL | role prompts and development schedule exist; product has no hidden worker and no live multi-agent wave evidence |
 | Full API adapter matrix (arXiv, OpenAlex, Crossref, Semantic Scholar) | PARTIAL | OpenAlex live retrieval and arXiv search adapter implemented; Crossref/S2 remain future adapters |
 | Sandboxed arbitrary experiment execution | NOT IMPLEMENTED | records are accepted; the CLI intentionally does not add a hidden runner/daemon |
@@ -24,7 +24,7 @@ Updated 2026-08-23 after strict project verification and immutable-review gate i
 
 ## Completion boundaries (evidence-backed)
 
-- **Implemented product:** 92%; locking, bounded local/HTTP source reads, redirect fail-closed checks, exact VERIFIED spans, claim-to-run links, scaffold-safe LaTeX rendering, and reproducibility supplements are implemented and tested.
+- **Implemented product:** 93%; locking, bounded local/HTTP source reads, redirect fail-closed checks, exact VERIFIED spans, claim-to-run links, review-target revalidation, scaffold-safe LaTeX rendering, and reproducibility supplements are implemented and tested.
 - **Deterministic E2E:** 100% of the bounded ClaimLedger demonstration; the current strict verification includes a passing `reviews` audit with **0 immutable review records** and reports `READY_FOR_HUMAN_REVIEW`. The empty audit confirms no broken review chain; it is not human scientific review or acceptance.
 - **Scientific human review:** 0% complete; human inspection of claims, limitations, novelty, and correctness remains required.
 - **External submission:** 0%; no submission or publication action was performed.
@@ -36,7 +36,7 @@ Topic: **ClaimLedger: a CPU-only controlled benchmark for detecting stale eviden
 Commands run successfully:
 
 ```text
-python -m unittest discover -s tests -v                         # exit 0, 10 tests
+python -m unittest discover -s tests -v                         # exit 0, 11 tests
 python -m py_compile howhow/*.py                                # exit 0
 python -m howhow source add data/corpus.txt --license CC0         # exit 0
 python -m howhow source add https://api.openalex.org/...         # exit 0, live official metadata retrieval
@@ -56,8 +56,8 @@ The final exact product verdict is `READY_FOR_HUMAN_REVIEW`. It means the determ
 ## Residual gaps
 
 - Human review and direction/novelty/correctness judgment remain required later; the committed demo has 0 immutable human-review records, so the passing empty audit must not be read as completed review.
-- The product does not yet provide a sandboxed arbitrary-code runner or statistical uncertainty engine. Independent immutable review records provide claim/evidence-bound findings, and strict project verification now includes their hash-chain audit as a named `reviews` check.
+- The product does not yet provide a sandboxed arbitrary-code runner or statistical uncertainty engine. Independent immutable review records provide claim/evidence-bound findings, and strict project verification now includes their hash-chain and retained-target integrity audit as a named `reviews` check.
 - Crossref and Semantic Scholar adapters, rebuild verification, and full claim-linter coverage are future work. Source archive extraction/hash validation is now part of finalization.
 - The experiment uses one short local fixture, one mutation, and one repetition; timing is descriptive only.
 
-Independent immutable review records are implemented with claim/evidence binding and strict hash-chain audit. They record human findings but do not decide correctness, novelty, or publication.
+Independent immutable review records are implemented with claim/evidence binding, strict hash-chain audit, and repeat validation of retained source spans and experiment records. They record human findings but do not decide correctness, novelty, or publication.
