@@ -106,6 +106,11 @@ def state_path(root: Path) -> Path:
 
 
 def append_event(root: Path, event: str, data: dict[str, Any] | None = None) -> dict[str, Any]:
+    with project_lock(root):
+        return _append_event_locked(root, event, data)
+
+
+def _append_event_locked(root: Path, event: str, data: dict[str, Any] | None = None) -> dict[str, Any]:
     data = data or {}
     events = event_path(root)
     previous = ""
@@ -211,8 +216,15 @@ def source_add(root: Path, location: str, license_name: str = "UNVERIFIED") -> d
     if parsed.scheme in {"http", "https"}:
         if parsed.hostname not in {"export.arxiv.org", "arxiv.org", "api.openalex.org"}:
             raise SystemExit("source URL host is not on the approved allowlist")
+        class ApprovedRedirects(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, req, fp, code, msg, headers, newurl):
+                target = urllib.parse.urlparse(newurl)
+                if target.hostname not in {"export.arxiv.org", "arxiv.org", "api.openalex.org"} or target.username or target.password:
+                    raise SystemExit("redirected source URL is not approved")
+                return super().redirect_request(req, fp, code, msg, headers, newurl)
         request = urllib.request.Request(location, headers={"User-Agent": "HowHow-Basic/0.1 (+local research tool)"})
-        with urllib.request.urlopen(request, timeout=30) as response:
+        opener = urllib.request.build_opener(ApprovedRedirects)
+        with opener.open(request, timeout=30) as response:
             if int(response.headers.get("Content-Length", "0") or 0) > MAX_SOURCE_BYTES:
                 raise SystemExit("source exceeds the 8 MiB limit")
             chunks = []
@@ -232,7 +244,13 @@ def source_add(root: Path, location: str, license_name: str = "UNVERIFIED") -> d
         path = Path(location).resolve()
         if not path.is_file():
             raise SystemExit(f"source file not found: {location}")
-        payload, final_url, media_type = path.read_bytes(), path.as_uri(), "application/octet-stream"
+        if path.stat().st_size > MAX_SOURCE_BYTES:
+            raise SystemExit("source exceeds the 8 MiB limit")
+        with path.open("rb") as source_file:
+            payload = source_file.read(MAX_SOURCE_BYTES + 1)
+        if len(payload) > MAX_SOURCE_BYTES:
+            raise SystemExit("source exceeds the 8 MiB limit")
+        final_url, media_type = path.as_uri(), "application/octet-stream"
     digest = sha256_bytes(payload)
     source_id = "src-" + digest[:16]
     target = root / ".howhow/sources/raw" / source_id
@@ -331,12 +349,16 @@ def audit_evidence(root: Path, strict: bool = False) -> dict[str, Any]:
         sid = record.get("source_id")
         source = sources.get(sid)
         if record.get("status") == "VERIFIED" and (not sid or not source or not record.get("quote") or not isinstance(record.get("locator"), dict)):
-            issues.append(f"{record.get("id")}: VERIFIED evidence requires source, quote, and locator")
+            issues.append(f"{record.get('id')}: VERIFIED evidence requires source, quote, and locator")
+        if record.get("status") == "VERIFIED" and ("claim" in record or "run_id" in record) and not isinstance(record.get("run_id"), str):
+            issues.append(f"{record.get('id')}: VERIFIED evidence requires run_id")
         if sid and source:
             payload = root / ".howhow/sources/raw" / sid / "payload"
             if not payload.exists() or sha256_file(payload) != source.get("sha256"):
                 issues.append(f"{record.get('id')}: source hash mismatch")
             locator = record.get("locator", {})
+            if record.get("status") == "VERIFIED" and not {"char_start", "char_end"} <= set(locator):
+                issues.append(f"{record.get('id')}: VERIFIED evidence requires exact char_start and char_end")
             if "char_start" in locator and "char_end" in locator:
                 text = payload.read_bytes().decode("utf-8", errors="replace")
                 start, end = locator["char_start"], locator["char_end"]
@@ -346,8 +368,11 @@ def audit_evidence(root: Path, strict: bool = False) -> dict[str, Any]:
                 quote = text[start:end]
                 if quote != record.get("quote", ""):
                     issues.append(f"{record.get('id')}: quote does not match source span")
-                checked += 1
-        elif sid:
+                if record.get("status") == "VERIFIED":
+                    checked += 1
+        if record.get("status") == "VERIFIED" and isinstance(record.get("run_id"), str) and not (root / ".howhow/experiments" / f"{record['run_id']}.json").exists():
+            issues.append(f"{record.get('id')}: unknown run_id {record['run_id']}")
+        if sid and not source:
             issues.append(f"{record.get('id')}: unknown source {sid}")
         if strict and record.get("status") != "VERIFIED":
             issues.append(f"{record.get('id')}: status is not VERIFIED")
@@ -492,6 +517,8 @@ def render_record_paper(root: Path) -> dict[str, Any]:
             continue
         metrics = json.dumps(record.get("metrics", {}), sort_keys=True, separators=(",", ":"))
         lines.append(r"\item[\texttt{" + _latex_escape(record.get("id", "")) + r"}] Status: " + _latex_escape(record.get("status", "")) + "; hypothesis: " + _latex_escape(record.get("hypothesis", "")) + r"; metrics: \texttt{" + _latex_escape(metrics) + "}.")
+    if not experiments:
+        lines.append(r"\item[None] No experiment records retained.")
     lines.extend([r"\end{description}", r"\subsection*{Plan completion}"])
     tasks = plan.get("tasks", []) if isinstance(plan, dict) else []
     lines.append("Recorded task identifiers: " + ", ".join(r"\texttt{" + _latex_escape(task.get("id", "")) + "}" for task in tasks if isinstance(task, dict)) + ".")
@@ -599,14 +626,17 @@ def validate_package(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
 
 def package_paper(root: Path, strict: bool = False) -> dict[str, Any]:
     paper = root / "paper"
-    files = [p for p in paper.rglob("*") if p.is_file() and not p.is_symlink() and p.suffix not in {".aux", ".log", ".bbl", ".blg", ".fls", ".fdb_latexmk", ".synctex.gz"}]
+    files = [(p, p.relative_to(paper).as_posix()) for p in paper.rglob("*") if p.is_file() and not p.is_symlink() and p.suffix not in {".aux", ".log", ".bbl", ".blg", ".fls", ".fdb_latexmk", ".synctex.gz"}]
+    supplement = [root / "run_benchmark.py", root / "generate_assets.py", root / "data/corpus.txt"]
+    supplement += sorted((root / ".howhow/experiments").glob("*.json"))
+    supplement += sorted((root / ".howhow/sources/records").glob("*.json"))
+    files += [(p, p.relative_to(root).as_posix()) for p in supplement if p.is_file() and not p.is_symlink()]
     if not (paper / "main.tex").exists() or not (paper / "references.bib").exists():
         raise SystemExit("package requires main.tex and references.bib")
     archive = root / "dist/arxiv-source.tar.gz"
     manifest = {"schema_version": SCHEMA_VERSION, "created_at": now(), "files": []}
     with tarfile.open(archive, "w:gz") as tar:
-        for file in sorted(files):
-            relative = file.relative_to(paper).as_posix()
+        for file, relative in sorted(files, key=lambda item: item[1]):
             if relative.startswith("../") or Path(relative).is_absolute():
                 raise SystemExit("unsafe package path")
             tar.add(file, arcname=relative, recursive=False)

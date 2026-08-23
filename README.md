@@ -12,7 +12,7 @@ python -m howhow verify --profile project
 python -m howhow paper finalize
 ```
 
-The source-tree entrypoint is `python bin/howhow.py ...`; `pip install -e .` installs the `howhow` executable. No network, model, database, daemon, or hidden worker is required for local operation. Network retrieval uses official arXiv/OpenAlex endpoints only and records raw responses when explicitly added.
+From a project directory, use the installed module or the explicit source-tree entrypoint: `python -m pip install -e D:/work/navin/research_agent/howhow_basic` then `python -m howhow ...`, or `python D:/work/navin/research_agent/howhow_basic/bin/howhow.py ...`. If the Scripts directory warning says `howhow.exe` is not on PATH, use the module/source-tree form. VERIFIED text evidence uses zero-based, end-exclusive UTF-8 character offsets; `char_end` excludes the trailing newline. `pip install -e .` installs the `howhow` executable. No network, model, database, daemon, or hidden worker is required for local operation. Network retrieval uses official arXiv/OpenAlex endpoints only and records raw responses when explicitly added.
 
 ## Product boundary
 

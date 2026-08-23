@@ -4,7 +4,7 @@ Updated 2026-08-23 after a live product-path run in `projects/claimledger/`.
 
 ## Evidence-backed completion
 
-**Overall MVP completion: 86% (implementation and deterministic/local acceptance).** This percentage is a capability estimate, not scientific acceptance. Against the broader autonomous research-to-LaTeX acceptance, the product remains partial because task execution and scientific review are intentionally human-owned.
+**Overall MVP completion: 92% (implemented product and deterministic/local acceptance).** This percentage is a capability estimate, not scientific acceptance. Against the broader autonomous research-to-LaTeX acceptance, the product remains partial because task execution and scientific review are intentionally human-owned.
 
 | Capability | Status | Evidence |
 |---|---|---|
@@ -14,12 +14,20 @@ Updated 2026-08-23 after a live product-path run in `projects/claimledger/`.
 | Exact evidence spans and audit | VERIFIED_LIVE | `ev-corpus-span-1`, strict audit passed; negative altered-span test is in unit tests and failure memory |
 | Experiment records and preserved failure | VERIFIED_LIVE | deterministic CPU benchmark success plus `claimledger-benchmark-failed-001` and failure log |
 | Research scaffold and role prompts | VERIFIED_DETERMINISTIC | `.pi/skills/howhow-basic`, `.pi/agents`, `schemas`, project layout |
-| LaTeX build and source package | VERIFIED_LIVE | MiKTeX `pdflatex`/`bibtex`, 3-page `dist/paper.pdf`, `dist/arxiv-source.tar.gz` |
+| LaTeX build and source package | VERIFIED_LIVE | MiKTeX `pdflatex`/`bibtex`, 4-page `dist/paper.pdf`, `dist/arxiv-source.tar.gz` |
 | Record-driven render/finalization gate | VERIFIED_LIVE | `paper render` emits `paper/howhow_records.tex`; `paper finalize` strictly audits records, builds LaTeX, validates archive extraction, then records `COMPLETE` |
 | Claims/reviews/gates and truthful readiness | PARTIAL | claim map and machine review report exist; no human scientific review, novelty decision, or external submission |
 | Parallel Pi-subagent waves | PARTIAL | role prompts and development schedule exist; product has no hidden worker and no live multi-agent wave evidence |
 | Full API adapter matrix (arXiv, OpenAlex, Crossref, Semantic Scholar) | PARTIAL | OpenAlex live retrieval and arXiv search adapter implemented; Crossref/S2 remain future adapters |
 | Sandboxed arbitrary experiment execution | NOT IMPLEMENTED | records are accepted; the CLI intentionally does not add a hidden runner/daemon |
+
+
+## Completion boundaries (evidence-backed)
+
+- **Implemented product:** 92%; locking, bounded local/HTTP source reads, redirect fail-closed checks, exact VERIFIED spans, claim-to-run links, scaffold-safe LaTeX rendering, and reproducibility supplements are implemented and tested.
+- **Deterministic E2E:** 100% of the bounded ClaimLedger demonstration; strict verification is `READY_FOR_HUMAN_REVIEW`, not scientific acceptance.
+- **Scientific human review:** 0% complete; human inspection of claims, limitations, novelty, and correctness remains required.
+- **External submission:** 0%; no submission or publication action was performed.
 
 ## End-to-end product evidence
 
