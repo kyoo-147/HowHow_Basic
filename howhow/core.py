@@ -664,6 +664,9 @@ def verify_project(root: Path, strict: bool = False, profile: str = "project") -
     check("sources", bool(source_items) and source_ok, f"{len(source_items)} source records")
     evidence = audit_evidence(root, strict=strict)
     check("evidence", evidence["passed"] and (not strict or evidence["checked"] > 0), f"{evidence['checked']} spans, {len(evidence['issues'])} issues")
+    from .reviews import audit as audit_reviews
+    review_result = audit_reviews(root, strict=strict)
+    check("reviews", review_result["passed"], f"{review_result['records']} immutable review records, {len(review_result['issues'])} issues")
     experiments = list((root / ".howhow/experiments").glob("*.json"))
     exp_ok = True
     for path in experiments:

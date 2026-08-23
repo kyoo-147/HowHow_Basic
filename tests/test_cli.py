@@ -103,6 +103,35 @@ class HowHowProductTests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             add(self.root, descriptor)
 
+    def test_verify_project_audits_immutable_reviews(self):
+        from unittest.mock import patch
+        from howhow.reviews import add
+        source = self.tmp / "review-audit-source.txt"
+        source.write_text("Auditable claim.\n", encoding="utf-8")
+        manifest = source_add(self.root, str(source), "CC0")
+        review = self.tmp / "review-audit.json"
+        review.write_text(json.dumps({
+            "id": "review-audit-1", "reviewer": "human-1", "finding": "Check claim",
+            "severity": "MAJOR", "claim": "Auditable claim", "source_id": manifest["source_id"],
+            "locator": {"char_start": 0, "char_end": 16}, "quote": "Auditable claim.",
+        }), encoding="utf-8")
+        add(self.root, review)
+        record = self.tmp / "review-audit-run.json"
+        record.write_text(json.dumps({
+            "id": "review-audit-run", "hypothesis": "fixture", "status": "SUCCESS", "raw_observations": [{"ok": True}],
+            "metrics": {"count": 1}, "command": ["fixture"], "code_revision": "fixture", "seed": 1,
+        }), encoding="utf-8")
+        record_experiment(self.root, record)
+        review_path = self.root / ".howhow/reviews/review-audit-1.json"
+        broken = json.loads(review_path.read_text(encoding="utf-8"))
+        broken["finding"] = "Tampered finding"
+        review_path.write_text(json.dumps(broken), encoding="utf-8")
+        with patch("howhow.core.build_paper", return_value={"passed": True}), patch("howhow.core.package_paper", return_value={"files": [], "validation": {"passed": True}}):
+            report = __import__("howhow.core", fromlist=["verify_project"]).verify_project(self.root)
+            self.assertFalse(next(check for check in report["checks"] if check["name"] == "reviews")["passed"])
+            with self.assertRaises(SystemExit):
+                __import__("howhow.core", fromlist=["verify_project"]).verify_project(self.root, strict=True)
+
     def test_continue_blocks_without_strict_verification(self):
         plan = self.tmp / "empty-plan.json"
         plan.write_text(json.dumps({"objective": "x", "tasks": []}), encoding="utf-8")
