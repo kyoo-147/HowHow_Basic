@@ -44,6 +44,49 @@ class HowHowProductTests(unittest.TestCase):
         add_evidence(self.root, descriptor)
         self.assertFalse(audit_evidence(self.root, strict=True)["passed"])
 
+    def test_evidence_audit_revalidates_descriptor_and_run_integrity(self):
+        source = self.tmp / "bound-source.txt"
+        source.write_text("Bound evidence claim.\n", encoding="utf-8")
+        manifest = source_add(self.root, str(source), "CC0")
+        for run_id in ("bound-run-1", "bound-run-2"):
+            run_descriptor = self.tmp / f"{run_id}.json"
+            run_descriptor.write_text(json.dumps({
+                "id": run_id, "hypothesis": "fixture", "command": ["fixture"],
+                "status": "SUCCESS", "raw_observations": [{"ok": True}],
+                "metrics": {"count": 1}, "code_revision": "fixture", "seed": 1,
+            }), encoding="utf-8")
+            record_experiment(self.root, run_descriptor)
+        descriptor = self.tmp / "bound-evidence.json"
+        descriptor.write_text(json.dumps({
+            "id": "ev-bound", "status": "VERIFIED", "source_id": manifest["source_id"],
+            "claim": "Bound claim", "locator": {"char_start": 0, "char_end": 21},
+            "quote": "Bound evidence claim.", "run_id": "bound-run-1",
+        }), encoding="utf-8")
+        add_evidence(self.root, descriptor)
+        self.assertTrue(audit_evidence(self.root, strict=True)["passed"])
+
+        evidence_path = self.root / ".howhow/evidence/ev-bound.json"
+        original_evidence = evidence_path.read_bytes()
+        evidence = json.loads(original_evidence)
+        evidence["claim"] = "Tampered claim"
+        evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
+        self.assertTrue(any("evidence record hash mismatch" in issue for issue in audit_evidence(self.root, strict=True)["issues"]))
+        evidence_path.write_bytes(original_evidence)
+
+        evidence = json.loads(original_evidence)
+        evidence["run_id"] = "bound-run-2"
+        evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
+        run_id_issues = audit_evidence(self.root, strict=True)["issues"]
+        self.assertTrue(any("evidence record hash mismatch" in issue for issue in run_id_issues))
+        self.assertFalse(any("unknown run_id" in issue for issue in run_id_issues))
+        evidence_path.write_bytes(original_evidence)
+
+        run_path = self.root / ".howhow/experiments/bound-run-1.json"
+        run = json.loads(run_path.read_text(encoding="utf-8"))
+        run["metrics"] = {"count": 2}
+        run_path.write_text(json.dumps(run), encoding="utf-8")
+        self.assertTrue(any("experiment integrity check failed" in issue for issue in audit_evidence(self.root, strict=True)["issues"]))
+
     def test_source_pin_and_read_only_use(self):
         from howhow.core import source_inspect, source_pin, source_use
         source = self.tmp / "pinned.txt"

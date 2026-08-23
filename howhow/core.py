@@ -346,6 +346,11 @@ def audit_evidence(root: Path, strict: bool = False) -> dict[str, Any]:
     issues: list[str] = []
     checked = 0
     for record in records:
+        evidence_id = record.get("id")
+        digest, unsigned = record.get("record_sha256"), dict(record)
+        unsigned.pop("record_sha256", None)
+        if not digest or digest != sha256_bytes(canonical(unsigned)):
+            issues.append(f"{evidence_id}: evidence record hash mismatch")
         sid = record.get("source_id")
         source = sources.get(sid)
         if record.get("status") == "VERIFIED" and (not sid or not source or not record.get("quote") or not isinstance(record.get("locator"), dict)):
@@ -370,8 +375,30 @@ def audit_evidence(root: Path, strict: bool = False) -> dict[str, Any]:
                     issues.append(f"{record.get('id')}: quote does not match source span")
                 if record.get("status") == "VERIFIED":
                     checked += 1
-        if record.get("status") == "VERIFIED" and isinstance(record.get("run_id"), str) and not (root / ".howhow/experiments" / f"{record['run_id']}.json").exists():
-            issues.append(f"{record.get('id')}: unknown run_id {record['run_id']}")
+        if record.get("status") == "VERIFIED" and isinstance(record.get("run_id"), str):
+            run_id = record["run_id"]
+            try:
+                safe_id(run_id, "run id")
+            except SystemExit as exc:
+                issues.append(f"{record.get('id')}: {exc}")
+            else:
+                run_path = root / ".howhow/experiments" / f"{run_id}.json"
+                if not run_path.exists():
+                    issues.append(f"{record.get('id')}: unknown run_id {run_id}")
+                else:
+                    try:
+                        run = read_json(run_path)
+                    except (OSError, ValueError):
+                        run = None
+                    if not isinstance(run, dict):
+                        issues.append(f"{record.get('id')}: experiment record unreadable for run_id {run_id}")
+                    elif run.get("id") != run_id:
+                        issues.append(f"{record.get('id')}: run_id {run_id} does not match retained experiment")
+                    else:
+                        run_digest, run_unsigned = run.get("record_sha256"), dict(run)
+                        run_unsigned.pop("record_sha256", None)
+                        if not run_digest or run_digest != sha256_bytes(canonical(run_unsigned)):
+                            issues.append(f"{record.get('id')}: experiment integrity check failed for run_id {run_id}")
         if sid and not source:
             issues.append(f"{record.get('id')}: unknown source {sid}")
         if strict and record.get("status") != "VERIFIED":

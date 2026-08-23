@@ -1,17 +1,17 @@
 # HowHow Basic status
 
-Updated 2026-08-23 after strict review-target integrity validation.
+Updated 2026-08-23 after strict evidence-descriptor and experiment integrity validation.
 
 ## Evidence-backed completion
 
-**Overall MVP completion: 93% (implemented product and deterministic/local acceptance).** This percentage is a capability estimate, not scientific acceptance. Against the broader autonomous research-to-LaTeX acceptance, the product remains partial because task execution and scientific review are intentionally human-owned.
+**Overall MVP completion: 95% (implemented product and deterministic/local acceptance).** This percentage is a capability estimate, not scientific acceptance. Against the broader autonomous research-to-LaTeX acceptance, the product remains partial because task execution and scientific review are intentionally human-owned.
 
 | Capability | Status | Evidence |
 |---|---|---|
 | Project-local conversational CLI and filesystem state | VERIFIED_DETERMINISTIC | `howhow init`, status, pause/resume, continuation, atomic JSON state |
 | Plans, human gate, checkpoints, append-only events | VERIFIED_LIVE | `projects/claimledger/.howhow/events.jsonl`; human continuation returned `NEEDS_HUMAN` and accepted an explicit response |
 | Source registry and safe cached retrieval | VERIFIED_LIVE | local CC0 fixture plus official OpenAlex REST response, raw payload hashes and manifests |
-| Exact evidence spans and audit | VERIFIED_LIVE | `ev-corpus-span-1`, strict audit passed; negative altered-span test is in unit tests and failure memory |
+| Exact evidence spans and audit | VERIFIED_LIVE | `ev-corpus-span-1`, strict audit passed; descriptor hashes and referenced experiment contents are revalidated, with negative span/claim/run-binding tests |
 | Experiment records and preserved failure | VERIFIED_LIVE | deterministic CPU benchmark success plus `claimledger-benchmark-failed-001` and failure log |
 | Research scaffold and role prompts | VERIFIED_DETERMINISTIC | `.pi/skills/howhow-basic`, `.pi/agents`, `schemas`, project layout |
 | LaTeX build and source package | VERIFIED_LIVE | MiKTeX `pdflatex`/`bibtex`, 4-page `dist/paper.pdf`, `dist/arxiv-source.tar.gz` |
@@ -24,7 +24,7 @@ Updated 2026-08-23 after strict review-target integrity validation.
 
 ## Completion boundaries (evidence-backed)
 
-- **Implemented product:** 93%; locking, bounded local/HTTP source reads, redirect fail-closed checks, exact VERIFIED spans, claim-to-run links, review-target revalidation, scaffold-safe LaTeX rendering, and reproducibility supplements are implemented and tested.
+- **Implemented product:** 95%; locking, bounded local/HTTP source reads, redirect fail-closed checks, exact VERIFIED spans, evidence descriptor and claim-to-run integrity checks, review-target revalidation, scaffold-safe LaTeX rendering, and reproducibility supplements are implemented and tested.
 - **Deterministic E2E:** 100% of the bounded ClaimLedger demonstration; the current strict verification includes a passing `reviews` audit with **0 immutable review records** and reports `READY_FOR_HUMAN_REVIEW`. The empty audit confirms no broken review chain; it is not human scientific review or acceptance.
 - **Scientific human review:** 0% complete; human inspection of claims, limitations, novelty, and correctness remains required.
 - **External submission:** 0%; no submission or publication action was performed.
