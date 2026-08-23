@@ -1,0 +1,42 @@
+{
+  "id": "claimledger-benchmark-001",
+  "hypothesis": "hash identity rejects a controlled mutation while path-only identity accepts it",
+  "command": [
+    "python",
+    "run_benchmark.py"
+  ],
+  "code_revision": "working-tree-claimledger-benchmark-v1",
+  "seed": 17,
+  "status": "SUCCESS",
+  "raw_observations": [
+    {
+      "condition": "valid",
+      "content_addressed_rejects": false,
+      "path_only_accepts": true,
+      "latency_us": 27.4
+    },
+    {
+      "condition": "mutated",
+      "content_addressed_rejects": true,
+      "path_only_accepts": true,
+      "latency_us": 3.4
+    }
+  ],
+  "metrics": {
+    "content_addressed_invalid_acceptance_rate": 0.0,
+    "path_only_invalid_acceptance_rate": 1.0,
+    "valid_content_rejection_rate": 0.0,
+    "repetitions": 1,
+    "warmup": 0
+  },
+  "limitations": [
+    "one local synthetic mutation",
+    "one repetition",
+    "does not establish general scientific validity"
+  ],
+  "environment": {
+    "python": "stdlib",
+    "platform": "portable CPU"
+  },
+  "recorded_at": "2026-08-23T09:35:37Z"
+}

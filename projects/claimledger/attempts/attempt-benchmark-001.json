@@ -1,0 +1,1 @@
+{"task_id":"benchmark","phase_id":"phase-experiment","wave_id":"wave-benchmark","attempt_id":"attempt-benchmark-001","idempotency_key":"benchmark:1","provider":"local-python","status":"SUCCESS","artifact_hashes":["claimledger-benchmark-001"]}

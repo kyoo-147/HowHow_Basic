@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","required":["mission_id","goal","status","phases"],"properties":{"mission_id":{"type":"string"},"goal":{"type":"string"},"status":{"enum":["NEW","READY","RUNNING","PAUSED","NEEDS_HUMAN","BLOCKED","COMPLETE","FAILED","INCONCLUSIVE","CANCELLED"]},"phases":{"type":"array"},"budget":{"type":"object"}}}

@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","required":["id","status"],"properties":{"id":{"type":"string"},"status":{"enum":["VERIFIED","UNVERIFIED","BLOCKED","USER ACTION REQUIRED LATER","SKIP"]},"source_id":{"type":"string"},"locator":{"type":"object"},"quote":{"type":"string"}}}

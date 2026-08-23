@@ -1,0 +1,59 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\title{ClaimLedger: A CPU-Only Controlled Benchmark for Detecting Stale Evidence Links}
+\author{HowHow Basic demonstration}
+\date{August 2026}
+\begin{document}
+\maketitle
+\begin{abstract}
+Research software can retain a citation key while the bytes behind a source have changed. We implement a small content-addressed evidence ledger and compare it with a path-only record on a deliberately controlled mutation. In one deterministic local run, the hash check rejected the mutation and the path-only record accepted it. This is an implementation benchmark, not a claim of universal citation correctness, scientific novelty, or publication readiness. All numerical statements are generated from the immutable experiment record included with this package.
+\end{abstract}
+
+\section{Introduction}
+Reproducibility and transparent computational research require more than a name or path for an input. The Galaxy platform, for example, frames reproducibility and transparency as explicit research infrastructure goals \cite{blazejewski2010}. HowHow Basic explores a narrower systems question: can a retained byte hash provide a stronger local identity check than a path-only record when a controlled source mutation is introduced?
+
+This paper is intentionally scoped as a feasibility benchmark. The mutation is synthetic, the corpus is one short CC0 fixture, and the experiment has one repetition. We therefore use cautious language: the run demonstrates behavior on the selected fixture; it does not establish a general scientific result.
+
+\section{Research question and hypotheses}
+The question is whether content-addressed identity detects a modified payload that retains the same logical path. H1 predicts rejection of the modified payload by hash identity. H0 is the path-only comparison, which has no byte-level signal and therefore accepts the same path. The direction was explicitly approved by a human through the HowHow continuation gate.
+
+\section{System}
+The product stores each source payload under an identifier derived from SHA-256, alongside a manifest containing the canonical URL or local locator, retrieval time, license/access status, media type, byte length, and hash. Evidence descriptors point to a source identifier and exact character offsets. The audit command re-reads the retained payload and compares the quoted bytes. Corrections are new immutable records; old failures remain in the append-only failure log.
+
+\section{Corpus and source provenance}
+The local fixture contains three short statements about byte identity, exact spans, and the synthetic nature of the mutation. It is retained with a CC0 label for this demonstration. The project also retrieved OpenAlex metadata through its official REST endpoint; that response is stored as a raw, hashed source record with its retrieval URL and timestamp. OpenAlex metadata retrieval is evidence of retrieval provenance, not a license to redistribute underlying papers.
+
+\section{Experimental method}
+The deterministic CPU runner uses Python's standard-library SHA-256 implementation. It evaluates one valid payload and one payload whose final byte is changed. For each condition it records the raw condition, boolean decisions, and observed hash-check latency. The path-only baseline always accepts the path. No GPU, network call, secret, or model provider is used by the run. A failed negative-control record with an empty metric payload was also registered intentionally; it remains visible and is not reclassified as success.
+
+\begin{table}[ht]
+\centering
+\caption{Generated from the immutable benchmark record. Latency is descriptive only.}
+\input{tables/results.tex}
+\end{table}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=.65\linewidth]{figures/benchmark.pdf}
+\caption{Generated figure source and output are retained under the paper directory. The controlled mutated condition is accepted by the path-only baseline and rejected by the hash check.}
+\end{figure}
+
+\clearpage
+\section{Results}
+The valid condition was not rejected by the content-addressed check, while the mutated condition was rejected. The recorded invalid-acceptance rate was 0.0 for the hash check and 1.0 for the path-only baseline. These values are exact recomputations from two raw observations in run \texttt{claimledger-benchmark-001}; they are not typed-in measurements. The recorded latencies were 27.4 and 3.4 microseconds on this run and are included only as provenance, not as a performance claim.
+
+\section{Failure memory and verification}
+The project first exercised an invalid evidence span and retained the resulting audit failure. It then created a corrected immutable evidence descriptor. Separately, \texttt{claimledger-benchmark-failed-001} records a deliberate runner failure with exit code 1 and remains in the failure log after the successful run. This distinction matters: successful reruns repair a workflow but do not erase its history. The final product verification checks the event hash chain, source hashes, exact span, experiment records, clean LaTeX build, and archive contents.
+
+\section{Limitations and uncertainty}
+This is a controlled robustness fixture rather than a natural-world corpus. One source, one byte mutation, one repetition, and one local Python implementation cannot estimate deployment error rates, statistical uncertainty, generality across extraction formats, or researcher behavior. Character spans are appropriate for the UTF-8 text fixture but do not solve PDF layout, OCR, page-coordinate, version, retraction, or access-rights problems. The path-only baseline is intentionally weak and should not be interpreted as a representative production system. Future work would use a licensed multi-document corpus, multiple mutation classes, repeated runs, independent implementations, and human review of claim semantics.
+
+\section{Conclusion}
+On the selected fixture and run, content-addressed identity detected the controlled source mutation while the path-only record did not. The result supports using byte hashes as one integrity layer in an evidence ledger. It does not establish novelty, scientific correctness, acceptance, or arXiv eligibility. A human must inspect the complete package before any publication decision.
+
+\bibliographystyle{plain}
+\bibliography{references}
+\end{document}

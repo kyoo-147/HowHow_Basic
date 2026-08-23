@@ -1,0 +1,3 @@
+Content-addressed evidence preserves an exact byte identity for each source.
+An evidence span is valid only when its recorded quote matches the retained source bytes.
+Controlled source mutations are synthetic robustness fixtures, not natural-world evidence.
