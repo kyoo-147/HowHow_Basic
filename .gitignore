@@ -12,3 +12,4 @@ nul
 
 # Local Pi subagent runtime state (schedules, missions, run receipts)
 .pi/subagents/
+.howhow/builds/

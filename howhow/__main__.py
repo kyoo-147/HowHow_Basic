@@ -119,8 +119,11 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 result = finalize_project(root)
                 emit(result)
-                if result["state"] != "COMPLETE": return 1
-        elif args.command == "package": emit(package_paper(root, args.strict))
+                if result["state"] not in {"COMPLETE", "READY_FOR_HUMAN_REVIEW"}: return 1
+        elif args.command == "package":
+            result = package_paper(root, args.strict)
+            emit(result)
+            if not result.get("validation", {}).get("passed", False): return 1
         elif args.command == "verify":
             result = verify_project(root, args.strict, args.profile)
             emit(result)

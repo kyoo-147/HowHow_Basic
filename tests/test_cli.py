@@ -32,6 +32,18 @@ class HowHowProductTests(unittest.TestCase):
         self.assertFalse(audit_evidence(self.root)["passed"])
         self.assertFalse(audit_evidence(self.root)["passed"])
 
+    def test_identifiers_and_spans_fail_closed(self):
+        from howhow.core import source_inspect
+        with self.assertRaises(SystemExit):
+            source_inspect(self.root, "../outside")
+        source = self.tmp / "span.txt"
+        source.write_text("safe", encoding="utf-8")
+        manifest = source_add(self.root, str(source), "CC0")
+        descriptor = self.tmp / "bad-evidence.json"
+        descriptor.write_text(json.dumps({"id": "ev-bad", "status": "VERIFIED", "source_id": manifest["source_id"], "locator": {"char_start": -1, "char_end": 2}, "quote": "safe"}), encoding="utf-8")
+        add_evidence(self.root, descriptor)
+        self.assertFalse(audit_evidence(self.root, strict=True)["passed"])
+
     def test_source_pin_and_read_only_use(self):
         from howhow.core import source_inspect, source_pin, source_use
         source = self.tmp / "pinned.txt"

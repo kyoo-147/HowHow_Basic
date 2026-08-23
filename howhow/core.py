@@ -1,5 +1,37 @@
 from __future__ import annotations
 
+import contextlib
+import re
+
+SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+MAX_SOURCE_BYTES = 8 * 1024 * 1024
+
+def safe_id(value: Any, label: str = "id") -> str:
+    if not isinstance(value, str) or not SAFE_ID.fullmatch(value):
+        raise SystemExit(f"invalid {label}: use 1-128 letters, digits, '.', '_' or '-'")
+    return value
+
+@contextlib.contextmanager
+def project_lock(root: Path):
+    lock = root / ".howhow" / ".lock"
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    deadline = datetime.now().timestamp() + 15
+    while True:
+        try:
+            fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.close(fd)
+            break
+        except FileExistsError:
+            if datetime.now().timestamp() >= deadline:
+                raise SystemExit("project is busy; retry later")
+            import time
+            time.sleep(0.05)
+    try:
+        yield
+    finally:
+        lock.unlink(missing_ok=True)
+
+
 import hashlib
 import json
 import os
@@ -159,6 +191,7 @@ def save_plan(root: Path, source: Path) -> dict[str, Any]:
     for task in plan["tasks"]:
         if not isinstance(task, dict) or not task.get("id") or task["id"] in ids:
             raise SystemExit("plan tasks require unique ids")
+        safe_id(task["id"], "task id")
         ids.add(task["id"])
         if not isinstance(task.get("acceptance", []), list) or not isinstance(task.get("required_evidence", []), list):
             raise SystemExit(f"invalid acceptance/evidence for task {task['id']}")
@@ -173,11 +206,27 @@ def save_plan(root: Path, source: Path) -> dict[str, Any]:
 
 def source_add(root: Path, location: str, license_name: str = "UNVERIFIED") -> dict[str, Any]:
     parsed = urllib.parse.urlparse(location)
+    if parsed.username or parsed.password:
+        raise SystemExit("source URL must not contain credentials")
     if parsed.scheme in {"http", "https"}:
+        if parsed.hostname not in {"export.arxiv.org", "arxiv.org", "api.openalex.org"}:
+            raise SystemExit("source URL host is not on the approved allowlist")
         request = urllib.request.Request(location, headers={"User-Agent": "HowHow-Basic/0.1 (+local research tool)"})
         with urllib.request.urlopen(request, timeout=30) as response:
-            payload = response.read()
+            if int(response.headers.get("Content-Length", "0") or 0) > MAX_SOURCE_BYTES:
+                raise SystemExit("source exceeds the 8 MiB limit")
+            chunks = []
+            total = 0
+            while chunk := response.read(1024 * 1024):
+                total += len(chunk)
+                if total > MAX_SOURCE_BYTES:
+                    raise SystemExit("source exceeds the 8 MiB limit")
+                chunks.append(chunk)
+            payload = b"".join(chunks)
             final_url = response.geturl()
+            final = urllib.parse.urlparse(final_url)
+            if final.hostname not in {"export.arxiv.org", "arxiv.org", "api.openalex.org"} or final.username or final.password:
+                raise SystemExit("redirected source URL is not approved")
             media_type = response.headers.get_content_type()
     else:
         path = Path(location).resolve()
@@ -226,6 +275,7 @@ def source_search(root: Path, provider: str, query: str, limit: int = 5) -> list
 
 
 def source_inspect(root: Path, source_id: str) -> dict[str, Any]:
+    safe_id(source_id, "source id")
     manifest = read_json(root / ".howhow/sources/records" / f"{source_id}.json")
     if not manifest:
         raise SystemExit(f"unknown source: {source_id}")
@@ -257,6 +307,7 @@ def add_evidence(root: Path, descriptor: Path) -> dict[str, Any]:
     record = read_json(descriptor)
     if not isinstance(record, dict) or not record.get("id"):
         raise SystemExit("evidence descriptor requires id")
+    safe_id(record["id"], "evidence id")
     status = record.get("status", "UNVERIFIED")
     if status not in LABELS:
         raise SystemExit("evidence status must be one of VERIFIED, UNVERIFIED, BLOCKED, USER ACTION REQUIRED LATER, SKIP")
@@ -279,6 +330,8 @@ def audit_evidence(root: Path, strict: bool = False) -> dict[str, Any]:
     for record in records:
         sid = record.get("source_id")
         source = sources.get(sid)
+        if record.get("status") == "VERIFIED" and (not sid or not source or not record.get("quote") or not isinstance(record.get("locator"), dict)):
+            issues.append(f"{record.get("id")}: VERIFIED evidence requires source, quote, and locator")
         if sid and source:
             payload = root / ".howhow/sources/raw" / sid / "payload"
             if not payload.exists() or sha256_file(payload) != source.get("sha256"):
@@ -286,7 +339,11 @@ def audit_evidence(root: Path, strict: bool = False) -> dict[str, Any]:
             locator = record.get("locator", {})
             if "char_start" in locator and "char_end" in locator:
                 text = payload.read_bytes().decode("utf-8", errors="replace")
-                quote = text[int(locator["char_start"]):int(locator["char_end"])]
+                start, end = locator["char_start"], locator["char_end"]
+                if type(start) is not int or type(end) is not int or not (0 <= start <= end <= len(text)):
+                    issues.append(f"{record.get("id")}: invalid evidence span")
+                    continue
+                quote = text[start:end]
                 if quote != record.get("quote", ""):
                     issues.append(f"{record.get('id')}: quote does not match source span")
                 checked += 1
@@ -311,6 +368,7 @@ def record_experiment(root: Path, descriptor: Path) -> dict[str, Any]:
         raise SystemExit("experiment record missing: " + ", ".join(missing))
     if record["status"] not in {"SUCCESS", "FAILED", "INCONCLUSIVE"}:
         raise SystemExit("experiment status must be SUCCESS, FAILED, or INCONCLUSIVE")
+    safe_id(record["id"], "experiment id")
     record["schema_version"] = SCHEMA_VERSION
     record["recorded_at"] = record.get("recorded_at", now())
     record["record_sha256"] = sha256_bytes(canonical(record))
@@ -366,8 +424,8 @@ def finalize_project(root: Path) -> dict[str, Any]:
     state = read_json(state_path(root), {})
     if state.get("paused"):
         return {"state": "PAUSED", "message": "resume is required before finalization"}
-    if state.get("state") == "COMPLETE":
-        return {"state": "COMPLETE", "message": "project was already finalized"}
+    if state.get("state") in TERMINAL:
+        return {"state": state.get("state"), "message": "project is terminal"}
     try:
         rendered = render_record_paper(root)
         verification = verify_project(root, strict=True, profile="project")
@@ -377,16 +435,18 @@ def finalize_project(root: Path) -> dict[str, Any]:
         atomic_json(state_path(root), state)
         append_event(root, "project.finalization_blocked", {"error": str(exc)})
         return {"state": "BLOCKED", "message": str(exc)}
-    state.update({"state": "COMPLETE", "current_task": None, "verdict": verification["verdict"], "package_validated": package["validation"]["passed"]})
+    state.update({"state": "READY_FOR_HUMAN_REVIEW", "current_task": None, "verdict": verification["verdict"], "package_validated": package["validation"]["passed"]})
     atomic_json(state_path(root), state)
-    append_event(root, "project.completed", {"verification": verification["verdict"], "package_validated": package["validation"]["passed"]})
-    return {"state": "COMPLETE", "message": "records rendered, verified, built, and packaged", "verification": verification, "package": {"files": len(package["files"]), "validated": package["validation"]["passed"]}}
+    append_event(root, "project.ready_for_human_review", {"verification": verification["verdict"], "package_validated": package["validation"]["passed"]})
+    return {"state": "READY_FOR_HUMAN_REVIEW", "message": "records rendered, verified, and packaged; human review remains required", "verification": verification, "package": {"files": len(package["files"]), "validated": package["validation"]["passed"]}}
 
 
 def set_paused(root: Path, paused: bool, reason: str = "") -> dict[str, Any]:
     state = read_json(state_path(root), {})
     state["paused"] = paused
-    state["state"] = "PAUSED" if paused else "READY"
+    if not paused and state.get("state") in TERMINAL | {"READY_FOR_HUMAN_REVIEW"}:
+        raise SystemExit("terminal projects cannot be resumed")
+    state["state"] = "PAUSED" if paused else state.get("state", "READY")
     if paused:
         state["pause_reason"] = reason
     else:
@@ -479,9 +539,9 @@ def build_paper(root: Path, strict: bool = False) -> dict[str, Any]:
         if strict:
             raise SystemExit(result["error"])
         return result
-    commands = [[pdflatex, "-interaction=nonstopmode", "-halt-on-error", "main.tex"]]
+    commands = [[pdflatex, "-no-shell-escape", "-interaction=nonstopmode", "-halt-on-error", "main.tex"]]
     if "\\bibliography{" in tex.read_text(encoding="utf-8") and bibtex:
-        commands += [[bibtex, "main"], [pdflatex, "-interaction=nonstopmode", "-halt-on-error", "main.tex"], [pdflatex, "-interaction=nonstopmode", "-halt-on-error", "main.tex"]]
+        commands += [[bibtex, "main"], [pdflatex, "-no-shell-escape", "-interaction=nonstopmode", "-halt-on-error", "main.tex"], [pdflatex, "-no-shell-escape", "-interaction=nonstopmode", "-halt-on-error", "main.tex"]]
     elif "\\bibliography{" in tex.read_text(encoding="utf-8"):
         result = {"build_id": build_id, "passed": False, "error": "bibtex not installed", "engine": pdflatex}
         atomic_json(build / "manifest.json", result)
@@ -539,7 +599,7 @@ def validate_package(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
 
 def package_paper(root: Path, strict: bool = False) -> dict[str, Any]:
     paper = root / "paper"
-    files = [p for p in paper.rglob("*") if p.is_file() and p.suffix not in {".aux", ".log", ".bbl", ".blg", ".fls", ".fdb_latexmk", ".synctex.gz"}]
+    files = [p for p in paper.rglob("*") if p.is_file() and not p.is_symlink() and p.suffix not in {".aux", ".log", ".bbl", ".blg", ".fls", ".fdb_latexmk", ".synctex.gz"}]
     if not (paper / "main.tex").exists() or not (paper / "references.bib").exists():
         raise SystemExit("package requires main.tex and references.bib")
     archive = root / "dist/arxiv-source.tar.gz"
