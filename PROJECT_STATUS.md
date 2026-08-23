@@ -25,7 +25,7 @@ Updated 2026-08-23 after strict project verification and immutable-review gate i
 ## Completion boundaries (evidence-backed)
 
 - **Implemented product:** 92%; locking, bounded local/HTTP source reads, redirect fail-closed checks, exact VERIFIED spans, claim-to-run links, scaffold-safe LaTeX rendering, and reproducibility supplements are implemented and tested.
-- **Deterministic E2E:** 100% of the bounded ClaimLedger demonstration; strict verification is `READY_FOR_HUMAN_REVIEW`, not scientific acceptance.
+- **Deterministic E2E:** 100% of the bounded ClaimLedger demonstration; the current strict verification includes a passing `reviews` audit with **0 immutable review records** and reports `READY_FOR_HUMAN_REVIEW`. The empty audit confirms no broken review chain; it is not human scientific review or acceptance.
 - **Scientific human review:** 0% complete; human inspection of claims, limitations, novelty, and correctness remains required.
 - **External submission:** 0%; no submission or publication action was performed.
 
@@ -55,7 +55,7 @@ The final exact product verdict is `READY_FOR_HUMAN_REVIEW`. It means the determ
 
 ## Residual gaps
 
-- Human review and direction/novelty/correctness judgment remain required later.
+- Human review and direction/novelty/correctness judgment remain required later; the committed demo has 0 immutable human-review records, so the passing empty audit must not be read as completed review.
 - The product does not yet provide a sandboxed arbitrary-code runner or statistical uncertainty engine. Independent immutable review records provide claim/evidence-bound findings, and strict project verification now includes their hash-chain audit as a named `reviews` check.
 - Crossref and Semantic Scholar adapters, rebuild verification, and full claim-linter coverage are future work. Source archive extraction/hash validation is now part of finalization.
 - The experiment uses one short local fixture, one mutation, and one repetition; timing is descriptive only.
