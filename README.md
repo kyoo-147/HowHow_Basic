@@ -36,3 +36,5 @@ python -m py_compile howhow/*.py
 ```
 
 The complete end-to-end evidence example is documented in `PROJECT_STATUS.md` and under `projects/claimledger/`. It uses official OpenAlex metadata, a CC0 local source fixture for exact-span checks, a deterministic CPU benchmark, a deliberately preserved failed run, and a multi-page LaTeX paper. This is a product demonstration, not a scientific acceptance or publication claim.
+
+Review findings are recorded separately with `review add`, audited with `review audit --strict`, and summarized with `review status`. They are immutable, bind to a claim and retained source span and/or experiment run, and never create scientific conclusions.

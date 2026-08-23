@@ -11,6 +11,7 @@ from .core import (
     package_paper, project_root, record_experiment, save_plan, set_paused,
     source_add, source_inspect, source_list, source_pin, source_search, source_use, status, verify_project, render_record_paper, finalize_project,
 )
+from .reviews import add as add_review, audit as audit_reviews, status as review_status
 
 
 def emit(value: object) -> None:
@@ -67,6 +68,13 @@ def parser() -> argparse.ArgumentParser:
     expsub = exp.add_subparsers(dest="experiment_command", required=True)
     er = expsub.add_parser("record")
     er.add_argument("file")
+    review = sub.add_parser("review")
+    reviewsub = review.add_subparsers(dest="review_command", required=True)
+    ra = reviewsub.add_parser("add")
+    ra.add_argument("file")
+    reviewaudit = reviewsub.add_parser("audit")
+    reviewaudit.add_argument("--strict", action="store_true")
+    reviewsub.add_parser("status")
     paper = sub.add_parser("paper")
     papersub = paper.add_subparsers(dest="paper_command", required=True)
     build = papersub.add_parser("build")
@@ -109,6 +117,13 @@ def main(argv: list[str] | None = None) -> int:
             emit(result)
             if args.evidence_command == "audit" and args.strict and not result["passed"]: return 1
         elif args.command == "experiment": emit(record_experiment(root, Path(args.file)))
+        elif args.command == "review":
+            if args.review_command == "add": emit(add_review(root, Path(args.file)))
+            elif args.review_command == "audit":
+                result = audit_reviews(root, args.strict)
+                emit(result)
+                if args.strict and not result["passed"]: return 1
+            else: emit(review_status(root))
         elif args.command == "paper":
             if args.paper_command == "build":
                 result = build_paper(root, args.strict)

@@ -56,6 +56,8 @@ The final exact product verdict is `READY_FOR_HUMAN_REVIEW`. It means the determ
 ## Residual gaps
 
 - Human review and direction/novelty/correctness judgment remain required later.
-- The product does not yet provide a sandboxed arbitrary-code runner, statistical uncertainty engine, or independent immutable review-record CLI.
+- The product does not yet provide a sandboxed arbitrary-code runner or statistical uncertainty engine. Independent immutable review records now provide claim/evidence-bound findings and strict hash-chain audit.
 - Crossref and Semantic Scholar adapters, rebuild verification, and full claim-linter coverage are future work. Source archive extraction/hash validation is now part of finalization.
 - The experiment uses one short local fixture, one mutation, and one repetition; timing is descriptive only.
+
+Independent immutable review records are implemented with claim/evidence binding and strict hash-chain audit. They record human findings but do not decide correctness, novelty, or publication.

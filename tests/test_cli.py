@@ -90,6 +90,19 @@ class HowHowProductTests(unittest.TestCase):
         self.assertIn(r"\%", generated)
         self.assertIn(r"\input{howhow_records.tex}", manuscript)
 
+    def test_immutable_review_record_binds_claim_and_span(self):
+        from howhow.reviews import add, audit, status
+        source = self.tmp / "review-source.txt"
+        source.write_text("Reviewable claim.\n", encoding="utf-8")
+        manifest = source_add(self.root, str(source), "CC0")
+        descriptor = self.tmp / "review.json"
+        descriptor.write_text(json.dumps({"id": "review-1", "reviewer": "human-1", "finding": "Check claim scope", "severity": "MAJOR", "claim": "Reviewable claim", "source_id": manifest["source_id"], "locator": {"char_start": 0, "char_end": 17}, "quote": "Reviewable claim."}), encoding="utf-8")
+        add(self.root, descriptor)
+        self.assertTrue(audit(self.root, strict=True)["passed"])
+        self.assertEqual(status(self.root)["by_severity"]["MAJOR"], 1)
+        with self.assertRaises(SystemExit):
+            add(self.root, descriptor)
+
     def test_continue_blocks_without_strict_verification(self):
         plan = self.tmp / "empty-plan.json"
         plan.write_text(json.dumps({"objective": "x", "tasks": []}), encoding="utf-8")
