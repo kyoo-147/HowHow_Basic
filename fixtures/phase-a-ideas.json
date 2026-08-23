@@ -1,0 +1,5 @@
+[
+ {"id":"fixture-a","title":"A","question":"bounded question A","evidence_plan":"fixture evidence A","gates":{"safety":true,"ethics":true,"license":true,"data":true,"evaluator":true,"resource":true,"evidence":true}},
+ {"id":"fixture-b","title":"B","question":"bounded question B","evidence_plan":"fixture evidence B","gates":{"safety":true,"ethics":true,"license":true,"data":true,"evaluator":true,"resource":true,"evidence":true}},
+ {"id":"fixture-c","title":"C","question":"bounded question C","evidence_plan":"fixture evidence C","gates":{"safety":true,"ethics":true,"license":true,"data":true,"evaluator":true,"resource":true,"evidence":true}}
+]

@@ -12,6 +12,8 @@ from .core import (
     source_add, source_inspect, source_list, source_pin, source_search, source_use, status, verify_project, render_record_paper, finalize_project,
 )
 from .reviews import add as add_review, audit as audit_reviews, status as review_status
+from .vnext import (brief_confirm, brief_propose, brief_show, capability_inspect, capability_list,
+    claim_add, claim_audit, idea_add, idea_rank, idea_select, target_confirm, target_propose)
 
 
 def emit(value: object) -> None:
@@ -51,8 +53,11 @@ def parser() -> argparse.ArgumentParser:
     save = plansub.add_parser("save")
     save.add_argument("file")
     plansub.add_parser("show")
+    start = sub.add_parser("start", help="show the bounded conversational Phase A path")
+    start.add_argument("--mode", choices=["Manual", "Hybrid", "Auto"], default="Hybrid")
     cont = sub.add_parser("continue")
     cont.add_argument("--response-file")
+    cont.add_argument("--mode", choices=["Manual", "Hybrid", "Auto"], default="Hybrid")
     st = sub.add_parser("status")
     st.add_argument("--json", action="store_true")
     pause = sub.add_parser("pause")
@@ -88,6 +93,21 @@ def parser() -> argparse.ArgumentParser:
     verify = sub.add_parser("verify")
     verify.add_argument("--strict", action="store_true")
     verify.add_argument("--profile", choices=["fixture", "project"], default="project")
+    cap = sub.add_parser("capability")
+    capsub = cap.add_subparsers(dest="capability_command", required=True)
+    capsub.add_parser("list")
+    ci = capsub.add_parser("inspect"); ci.add_argument("id")
+    brief = sub.add_parser("brief")
+    bsub = brief.add_subparsers(dest="brief_command", required=True)
+    bp = bsub.add_parser("propose"); bp.add_argument("title"); bp.add_argument("--mode", choices=["Manual","Hybrid","Auto"], default="Hybrid")
+    bsub.add_parser("show"); bc=bsub.add_parser("confirm"); bc.add_argument("id")
+    idea = sub.add_parser("idea"); isub=idea.add_subparsers(dest="idea_command", required=True)
+    ia=isub.add_parser("add"); ia.add_argument("file")
+    isub.add_parser("rank"); ise=isub.add_parser("select"); ise.add_argument("id")
+    target = sub.add_parser("target"); tsub=target.add_subparsers(dest="target_command", required=True)
+    tp=tsub.add_parser("propose"); tp.add_argument("idea_id"); tp.add_argument("--words",type=int,default=0); tp.add_argument("--pages",type=int,default=0); tp.add_argument("--figures",type=int,default=0); tp.add_argument("--tables",type=int,default=0); tp.add_argument("--rationale",default="")
+    tc=tsub.add_parser("confirm"); tc.add_argument("id"); tc.add_argument("decision")
+    claims=sub.add_parser("claim"); csub=claims.add_subparsers(dest="claim_command",required=True); ca=csub.add_parser("add"); ca.add_argument("file"); csub.add_parser("audit")
     return p
 
 
@@ -108,8 +128,22 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "plan":
             if args.plan_command == "save": emit(save_plan(root, Path(args.file)))
             else: emit(json.loads((root / ".howhow/plan.json").read_text(encoding="utf-8")))
+        elif args.command == "start":
+            emit({"mode": args.mode, "capabilities": capability_list(root), "sources": json.loads((root / ".howhow/integration-manifest.json").read_text(encoding="utf-8")), "steps": ["inspect capabilities", "propose/confirm brief", "rank 3-5 gated ideas", "select idea and confirm target", "build claim map, then human review"]})
         elif args.command == "continue":
-            emit(continue_project(root, Path(args.response_file) if args.response_file else None))
+            continuation = continue_project(root, Path(args.response_file) if args.response_file else None)
+            continuation.update({"mode": args.mode, "capabilities": capability_list(root)})
+            emit(continuation)
+        elif args.command == "capability":
+            emit(capability_list(root) if args.capability_command == "list" else capability_inspect(root,args.id))
+        elif args.command == "brief":
+            emit(brief_propose(root,args.title,args.mode) if args.brief_command == "propose" else brief_show(root) if args.brief_command == "show" else brief_confirm(root,args.id))
+        elif args.command == "idea":
+            emit(idea_add(root,json.loads(Path(args.file).read_text(encoding="utf-8"))) if args.idea_command == "add" else idea_rank(root) if args.idea_command == "rank" else idea_select(root,args.id))
+        elif args.command == "target":
+            emit(target_propose(root,args.idea_id,args.words,args.pages,args.figures,args.tables,args.rationale) if args.target_command == "propose" else target_confirm(root,args.id,args.decision))
+        elif args.command == "claim":
+            emit(claim_add(root,json.loads(Path(args.file).read_text(encoding="utf-8"))) if args.claim_command == "add" else claim_audit(root))
         elif args.command == "status":
             emit(status(root))
         elif args.command == "pause": emit(set_paused(root, True, args.reason))

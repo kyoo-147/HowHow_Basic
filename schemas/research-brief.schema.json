@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","required":["title","mode","status","steps"],"properties":{"title":{"type":"string"},"mode":{"enum":["Manual","Hybrid","Auto"]},"status":{"enum":["PROPOSED","CONFIRMED"]},"steps":{"type":"array","items":{"type":"string"}}}}

@@ -1,6 +1,8 @@
 ---
 name: literature
 description: HowHow Basic project role
+model: openai-codex/gpt-5.6-luna
+thinking: medium
 ---
 
 # Literature Agent

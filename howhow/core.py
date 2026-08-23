@@ -185,6 +185,9 @@ All reported results must be generated from immutable experiment records.
 \\end{document}
 """.replace("\\\\", "\\"), encoding="utf-8")
     (root / "paper/references.bib").write_text("% Add only verified bibliography records.\n", encoding="utf-8")
+    # Phase A files are deliberately local and deterministic; keep opinion empty.
+    from .vnext import init_vnext
+    init_vnext(root)
     append_event(root, "project.created", {"goal": goal or "", "root": root.name})
     return root
 
@@ -711,7 +714,8 @@ def set_paused(root: Path, paused: bool, reason: str = "") -> dict[str, Any]:
 
 def status(root: Path) -> dict[str, Any]:
     state = read_json(state_path(root), {})
-    return {"project": root.name, "root": str(root), "state": state, "sources": len(source_list(root)), "evidence": len(list((root / ".howhow/evidence").glob("*.json"))), "experiments": len(list((root / ".howhow/experiments").glob("*.json"))), "failures": len(list((root / ".howhow/failures.jsonl").read_text(encoding="utf-8").splitlines())) if (root / ".howhow/failures.jsonl").exists() else 0}
+    from .vnext import capability_list
+    return {"project": root.name, "root": str(root), "state": state, "sources": len(source_list(root)), "evidence": len(list((root / ".howhow/evidence").glob("*.json"))), "experiments": len(list((root / ".howhow/experiments").glob("*.json"))), "failures": len(list((root / ".howhow/failures.jsonl").read_text(encoding="utf-8").splitlines())) if (root / ".howhow/failures.jsonl").exists() else 0, "opinion": capability_list(root)["opinion"], "capabilities": capability_list(root)["capabilities"]}
 
 
 def _tool(name: str) -> str | None:
@@ -948,6 +952,9 @@ def verify_project(root: Path, strict: bool = False, profile: str = "project") -
     if experiment_issues:
         experiment_detail += ": " + "; ".join(experiment_issues)
     check("experiments", bool(experiments) and not experiment_issues, experiment_detail)
+    from .vnext import vnext_audit
+    vnext_result = vnext_audit(root)
+    check("vnext_records", vnext_result["passed"], f"{len(vnext_result['issues'])} Phase A schema/integrity issues")
     paper_result = build_paper(root, strict=False)
     check("latex", paper_result["passed"], paper_result.get("error", paper_result.get("pdf", "")))
     package = package_paper(root, strict=False) if paper_result["passed"] else {"files": []}
