@@ -13,8 +13,9 @@ from .core import (
 )
 from .reviews import add as add_review, audit as audit_reviews, status as review_status
 from .vnext import (brief_confirm, brief_propose, brief_show, capability_inspect, capability_list,
-    claim_add, claim_audit, idea_add, idea_rank, idea_select, target_confirm, target_propose)
+    claim_add, claim_audit, idea_add, idea_rank, idea_select, target_confirm, target_propose, init_vnext)
 from .literature import add_matrix, add_transformed, audit as audit_literature, candidate_adapter_request, create_protocol, decide_candidate, import_candidate
+from .experiment_v2 import proposal_create, proposal_list, objective_save, grant_issue, run_grant, doctor, experiment_audit
 
 
 def emit(value: object) -> None:
@@ -54,7 +55,7 @@ def parser() -> argparse.ArgumentParser:
     save = plansub.add_parser("save")
     save.add_argument("file")
     plansub.add_parser("show")
-    start = sub.add_parser("start", help="show the bounded conversational Phase A path")
+    start = sub.add_parser("start", help="show the bounded conversational research and experiment path")
     start.add_argument("--mode", choices=["Manual", "Hybrid", "Auto"], default="Hybrid")
     cont = sub.add_parser("continue")
     cont.add_argument("--response-file")
@@ -75,7 +76,14 @@ def parser() -> argparse.ArgumentParser:
     er = expsub.add_parser("record")
     er.add_argument("file")
     run = expsub.add_parser("run", help="run a bounded command from a JSON specification and retain its immutable result")
-    run.add_argument("file")
+    run.add_argument("file", nargs="?")
+    run.add_argument("--grant")
+    ep=expsub.add_parser("proposal"); ep.add_argument("file")
+    expsub.add_parser("proposals")
+    eo=expsub.add_parser("analysis"); eo.add_argument("file")
+    eg=expsub.add_parser("grant"); eg.add_argument("proposal_id"); eg.add_argument("project_id"); eg.add_argument("actor"); eg.add_argument("expires_at")
+    ed=expsub.add_parser("doctor"); ed.add_argument("proposal_id")
+    expsub.add_parser("audit")
     review = sub.add_parser("review")
     reviewsub = review.add_subparsers(dest="review_command", required=True)
     ra = reviewsub.add_parser("add")
@@ -124,7 +132,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
         if args.command == "init":
-            emit({"project": str(init_project(args.directory, args.goal)), "state": "NEW"})
+            project = init_project(args.directory, args.goal)
+            init_vnext(project)
+            emit({"project": str(project), "state": "NEW"})
             return 0
         root = root_from(args)
         if args.command == "source":
@@ -138,7 +148,7 @@ def main(argv: list[str] | None = None) -> int:
             if args.plan_command == "save": emit(save_plan(root, Path(args.file)))
             else: emit(json.loads((root / ".howhow/plan.json").read_text(encoding="utf-8")))
         elif args.command == "start":
-            emit({"mode": args.mode, "capabilities": capability_list(root), "sources": json.loads((root / ".howhow/integration-manifest.json").read_text(encoding="utf-8")), "steps": ["inspect capabilities and source plan", "create literature protocol and resolve consequential inclusion/access/license decisions", "expand, deduplicate, and retain exact evidence", "build literature matrix and contradiction/coverage audit", "propose/confirm brief, then ideate and human review"]})
+            emit({"mode": args.mode, "capabilities": capability_list(root), "sources": json.loads((root / ".howhow/integration-manifest.json").read_text(encoding="utf-8")), "steps": ["inspect capabilities and source plan", "create literature protocol and resolve consequential inclusion/access/license decisions", "expand, deduplicate, and retain exact evidence", "build literature matrix and contradiction/coverage audit", "propose/confirm brief, then ideate and human review", "plan one bounded baseline-first experiment", "show TRUSTED_LOCAL risk and request exactly one human approval before issuing a grant"]})
         elif args.command == "continue":
             continuation = continue_project(root, Path(args.response_file) if args.response_file else None)
             continuation.update({"mode": args.mode, "capabilities": capability_list(root)})
@@ -170,9 +180,16 @@ def main(argv: list[str] | None = None) -> int:
             emit(result)
             if args.evidence_command == "audit" and args.strict and not result["passed"]: return 1
         elif args.command == "experiment":
-            result = record_experiment(root, Path(args.file)) if args.experiment_command == "record" else run_experiment(root, Path(args.file))
+            if args.experiment_command == "record": result = record_experiment(root, Path(args.file))
+            elif args.experiment_command == "run": result = run_grant(root, args.grant) if args.grant else run_experiment(root, Path(args.file))
+            elif args.experiment_command == "proposal": result = proposal_create(root, json.loads(Path(args.file).read_text(encoding="utf-8")))
+            elif args.experiment_command == "proposals": result = proposal_list(root)
+            elif args.experiment_command == "analysis": result = objective_save(root, json.loads(Path(args.file).read_text(encoding="utf-8")))
+            elif args.experiment_command == "grant": result = grant_issue(root, args.proposal_id, args.project_id, args.actor, args.expires_at)
+            elif args.experiment_command == "doctor": result = doctor(root, args.proposal_id)
+            else: result = experiment_audit(root)
             emit(result)
-            if args.experiment_command == "run" and result["status"] == "FAILED": return 1
+            if args.experiment_command == "run" and result.get("status") == "FAILED": return 1
         elif args.command == "review":
             if args.review_command == "add": emit(add_review(root, Path(args.file)))
             elif args.review_command == "audit":

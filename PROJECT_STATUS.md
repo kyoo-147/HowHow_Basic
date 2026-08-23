@@ -1,6 +1,6 @@
 # HowHow Basic status
 
-Updated 2026-08-23 after adding bounded local experiment execution.
+Updated 2026-08-23 after adding bounded local experiment execution and Phase C trusted-local proposal/grant contracts.
 
 ## Evidence-backed status
 
@@ -19,7 +19,7 @@ Status is described by evidence and boundaries rather than completion percentage
 | Claims/reviews/gates and truthful readiness | PARTIAL | claim map and machine review report exist; strict verification audits immutable review hash chains and revalidates retained source spans and experiment integrity; no human scientific review, novelty decision, or external submission |
 | Parallel Pi-subagent waves | PARTIAL | role prompts and development schedule exist; product has no hidden worker and no live multi-agent wave evidence |
 | Full API adapter matrix (arXiv, OpenAlex, Crossref, Semantic Scholar) | PARTIAL | OpenAlex live retrieval and arXiv search adapter implemented; Crossref/S2 remain future adapters |
-| Bounded arbitrary experiment execution | VERIFIED_DETERMINISTIC_PARTIAL | `experiment run` uses an argument array without a shell, a temporary working directory containing declared hashed inputs, reduced environment, explicit seed, timeout, and retained-output limits; success and failure become immutable records. It is not an OS sandbox and does not prevent host filesystem or network access. |
+| Bounded arbitrary experiment execution | VERIFIED_DETERMINISTIC_PARTIAL | v1 remains backward compatible. Phase C adds immutable analysis/proposal/grant/result bindings, one-shot consumption, mutation checks, prebuilt-lock doctor, RECORD_ONLY/TRUSTED_LOCAL profiles, and truthful non-sandbox limitations. It is not an OS sandbox and does not prevent host filesystem or network access. |
 
 
 ## Completion boundaries (evidence-backed)

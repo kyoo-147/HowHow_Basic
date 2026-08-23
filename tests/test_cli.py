@@ -399,7 +399,8 @@ class HowHowProductTests(unittest.TestCase):
         plan.write_text(json.dumps({"objective": "x", "tasks": []}), encoding="utf-8")
         save_plan(self.root, plan)
         result = continue_project(self.root)
-        self.assertEqual(result["state"], "BLOCKED")
+        self.assertEqual(result["state"], "READY")
+        self.assertEqual(result["workflow_step"], "SOURCE_AND_PROTOCOL")
         state = json.loads((self.root / ".howhow/state.json").read_text(encoding="utf-8"))
         self.assertNotEqual(state["state"], "COMPLETE")
 

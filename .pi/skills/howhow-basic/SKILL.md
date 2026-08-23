@@ -29,6 +29,7 @@ Use the project-local `howhow` CLI as the durable control plane. The main Pi age
 - `howhow continue` / `howhow pause` / `howhow resume`
 - `howhow evidence add descriptor.json && howhow evidence audit --strict`
 - `howhow experiment record manifest.json`
+- Phase C: `experiment proposal`, `experiment analysis`, `experiment grant`, then `experiment run --grant`; TRUSTED_LOCAL is not a sandbox and OS/container isolation contracts are disabled.
 - `howhow paper build --strict && howhow package`
 - `howhow verify --strict`
 

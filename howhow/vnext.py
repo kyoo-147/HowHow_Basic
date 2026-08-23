@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .core import atomic_json, canonical, now, sha256_bytes, append_event, safe_id, sha256_file
+from .core import atomic_json, canonical, now, sha256_bytes, append_event, safe_id, sha256_file, read_json
 
 REPOS = [('wanshuiyin ARIS','9cbb6aab1084cd622ccb016cc156008fbdaa1402','upstream authority'),('Randall ARIS','10394e53e8651efcbedccd377c878e3ba929c3d4','older fork/compatibility snapshot'),('AI-Researcher','f9a6f8480860c193afff600eeffe3defcee8a978','reference'),('AgentLaboratory','d9017d90e329112d2a80b7712f37ee9094d2cd27','reference'),('AI-Scientist','1de1dbc1f4ee2c5f61e9c94348d55eb51d7fa2eb','reference'),('gpt-researcher','5d84d2f5553e70a2765a8ff3a0d2672d60437ce8','reference'),('deer-flow','917fe595fcfc2d5a30e7e55deed1bdb950785fc2','reference'),('sciagent','ece5fdfc9c62601883e21dc6e29939d38052e00f','reference'),('autoresearch','228791fb499afffb54b46200aca536f79142f117','reference'),('Academic-Paper-Skills','d67bf46aa3a0176847a2749ce84e99d556021f20','adapted skill'),('latex-arxiv-SKILL','349ce88a0797422911a4ce58ed335842e9b87e15','adapted skill'),('OpenScholar','0e9b8fb912273d3dae39e593da86e4f6d3bf8de1','reference'),('DeepScientist','b36624417f0c6b8238ec02db37b94d6db2faa5b0','reference')]
 GATES = ('safety','ethics','license','data','evaluator','resource','evidence')
@@ -38,9 +38,9 @@ def init_vnext(root):
         'AgentLaboratory': ('REFERENCE_REVIEWED', 'REFERENCE_ONLY', False),
         'AI-Scientist': ('RESTRICTED_REVIEW', 'RESTRICTED', False),
         'gpt-researcher': ('REFERENCE_REVIEWED', 'ADAPTER_DISABLED', False),
-        'deer-flow': ('UNVERIFIED', 'REFERENCE_ONLY', False),
+        'deer-flow': ('UNVERIFIED', 'ADAPTER_DISABLED', False),
         'sciagent': ('UNVERIFIED', 'REFERENCE_ONLY', False),
-        'autoresearch': ('UNVERIFIED', 'BLOCKED', False),
+        'autoresearch': ('REFERENCE_REVIEWED', 'ADAPTED', True),
         'Academic-Paper-Skills': ('PINNED_REVIEWED', 'ADAPTED', True),
         'latex-arxiv-SKILL': ('PINNED_REVIEWED', 'ADAPTED', True),
         'OpenScholar': ('REFERENCE_REVIEWED', 'REFERENCE_ONLY', False),
@@ -53,9 +53,9 @@ def init_vnext(root):
         'AgentLaboratory': ('agent workflow stages', 'reference stage mapping', 'reference-only; no calls'),
         'AI-Scientist': ('experiment lifecycle shape', 'restricted lifecycle notes', 'restricted review; no execution'),
         'gpt-researcher': ('bounded query, limit, offline flag', 'provisional candidate metadata contract', 'adapter request only; live false'),
-        'deer-flow': ('orchestration concepts', 'reference orchestration notes', 'reference-only; no calls'),
+        'deer-flow': ('orchestration concepts', 'disabled execution export contract with exact pin', 'disabled; no calls; no implicit dependencies'),
         'sciagent': ('literature workflow concepts', 'reference workflow notes', 'reference-only; no calls'),
-        'autoresearch': ('experiment loop concepts', 'reference experiment notes', 'blocked pending review'),
+        'autoresearch': ('baseline-first clean-room protocol: one declared change, fixed objective, ledger, bounded stop', 'tested protocol contract', 'protocol only; no git reset, no infinite loop, no live adapter'),
         'Academic-Paper-Skills': ('paper structure and evidence checklist', 'adapted checklist artifact', 'adapted skill; no copied code'),
         'latex-arxiv-SKILL': ('local build and package constraints', 'adapted build checklist', 'adapted skill; no submission'),
         'OpenScholar': ('literature synthesis concepts', 'reference synthesis notes', 'reference-only; no calls'),
@@ -69,7 +69,7 @@ def init_vnext(root):
 def capabilities(root):
     manifest = root / '.howhow/integration-manifest.json'
     entries = json.loads(manifest.read_text(encoding='utf-8'))['integrations'] if manifest.exists() else []
-    return [{'id': 'integration-' + safe_id(item['name'].lower().replace(' ', '-').replace('_', '-')), 'name': item['name'], 'status': item.get('use_mode', 'REFERENCE_ONLY'), 'enabled': item.get('enabled', False), 'live': item.get('live_status') == 'CALLED', 'sources': [item['name']], 'license_status': item['license_status'], 'sha': item['sha'], 'live_status': item.get('live_status', 'NOT_CALLED')} for item in entries]
+    return [{'id': 'integration-' + safe_id(item['name'].lower().replace(' ', '-').replace('_', '-')), 'name': item['name'], 'status': item.get('use_mode', 'REFERENCE_ONLY'), 'enabled': item.get('enabled', False), 'live': item.get('live_status') == 'CALLED', 'sources': [item['name']], 'license_status': item['license_status'], 'sha': item['sha'], 'live_status': item.get('live_status', 'NOT_CALLED'), 'limitations': item.get('limitations', 'No live adapter or execution is claimed')} for item in entries]
 
 def capability_list(root): return {'capabilities': capabilities(root), 'opinion': opinion_state(root)}
 def capability_inspect(root, identifier):
@@ -187,6 +187,8 @@ def vnext_audit(root):
     issues.extend(claims['issues'])
     from .literature import audit as literature_audit
     issues.extend('literature: ' + issue for issue in literature_audit(root)['issues'])
+    from .experiment_v2 import experiment_audit
+    issues.extend('experiment-v2: ' + issue for issue in experiment_audit(root)['issues'])
     return {'passed': not issues, 'issues': issues}
 
 def idea_add_validation(value):

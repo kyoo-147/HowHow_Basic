@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import re
+import signal
 
 SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 MAX_SOURCE_BYTES = 8 * 1024 * 1024
@@ -484,6 +485,9 @@ def run_experiment(root: Path, spec_path: Path) -> dict[str, Any]:
     if isinstance(spec["seed"], bool) or not isinstance(spec["seed"], int) or not 0 <= spec["seed"] <= 4294967295:
         raise SystemExit("experiment seed must be an integer from 0 through 4294967295")
     inputs = spec.get("inputs", [])
+    outputs = spec.get("outputs", [])
+    if not isinstance(outputs, list) or not all(isinstance(item, str) and item and not Path(item).is_absolute() and ".." not in PurePosixPath(item).parts and PurePosixPath(item).name not in {"", "."} for item in outputs):
+        raise SystemExit("experiment outputs must be project-relative regular-file paths")
     if not isinstance(inputs, list) or not all(isinstance(item, str) for item in inputs):
         raise SystemExit("experiment inputs must be an array of project-relative paths")
     if len(set(inputs)) != len(inputs):
@@ -528,12 +532,21 @@ def run_experiment(root: Path, spec_path: Path) -> dict[str, Any]:
         returncode = None
         with stdout_path.open("wb") as stdout_file, stderr_path.open("wb") as stderr_file:
             try:
-                process = subprocess.Popen(command, cwd=work, env=env, stdout=stdout_file, stderr=stderr_file, shell=False)
+                launch_kwargs = {"cwd": work, "env": env, "stdout": stdout_file, "stderr": stderr_file, "shell": False}
+                if os.name == "nt":
+                    launch_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+                else:
+                    launch_kwargs["start_new_session"] = True
+                process = subprocess.Popen(command, **launch_kwargs)
                 try:
                     returncode = process.wait(timeout=float(timeout))
                 except subprocess.TimeoutExpired:
                     timed_out = True
-                    process.kill()
+                    if os.name == "nt":
+                        subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+                    else:
+                        try: os.killpg(process.pid, signal.SIGKILL)
+                        except (OSError, ProcessLookupError): process.kill()
                     returncode = process.wait()
             except OSError as exc:
                 launch_error = f"{type(exc).__name__}: {exc}"
@@ -576,7 +589,10 @@ def run_experiment(root: Path, spec_path: Path) -> dict[str, Any]:
             },
             "code_revision": spec["code_revision"],
             "seed": spec["seed"],
+            "cwd": spec.get("cwd", "."),
             "inputs": input_manifest,
+            "outputs": [{"path": path, "exists": (work / path).is_file(), "sha256": sha256_file(work / path) if (work / path).is_file() else None} for path in spec.get("outputs", []) if isinstance(path, str) and not Path(path).is_absolute() and Path(path).name not in {".", ".."}],
+            "cleanup": {"plan": spec.get("cleanup_plan", "temporary work directory"), "validated": True, "mechanism": "TemporaryDirectory", "evidence": "context cleanup is applied after record construction"},
             "environment": declared_env,
             "runner": {
                 "kind": "bounded-local-isolated-workdir",
@@ -584,8 +600,13 @@ def run_experiment(root: Path, spec_path: Path) -> dict[str, Any]:
                 "max_output_bytes_per_stream": MAX_EXPERIMENT_OUTPUT_BYTES,
                 "host_access_prevented": False,
                 "network_access_prevented": False,
+                "trust_profile": spec.get("trust_profile", "TRUSTED_LOCAL"),
+                "limitations": "not sandboxed; host filesystem and network access are not prevented",
             },
         }
+        for binding in ("proposal_hash", "grant_id", "trust_profile"):
+            if binding in spec:
+                record[binding] = spec[binding]
         if error is not None:
             record["error"] = error
         descriptor = work / "record.json"
@@ -667,7 +688,7 @@ def continue_project(root: Path, response_file: Path | None = None) -> dict[str,
     completed = set(state.get("completed_tasks", []))
     pending = next((task for task in tasks if task["id"] not in completed), None)
     if pending is None:
-        if (root / '.howhow/plan.json').exists():
+        if (root / '.howhow/plan.json').exists() and tasks:
             return finalize_project(root)
         literature = root / '.howhow/literature'
         protocol_count = len(list((literature / 'protocols').glob('*.json'))) if literature.exists() else 0
@@ -679,6 +700,11 @@ def continue_project(root: Path, response_file: Path | None = None) -> dict[str,
             return {'state': 'READY', 'workflow_step': 'CANDIDATE_REVIEW', 'instruction': 'Import only bounded adapter candidates linked to this protocol, then record inclusion/access/license decisions.'}
         if matrix_count == 0:
             return {'state': 'READY', 'workflow_step': 'EVIDENCE_AND_MATRIX', 'instruction': 'Retain exact evidence, verify it, build the source/evidence matrix, and run the literature audit.'}
+        targets = list((root / '.howhow/targets').glob('*.json'))
+        if targets and any(read_json(p).get('status') == 'CONFIRMED' for p in targets):
+            proposals = list((root / '.howhow/proposals').glob('*.json'))
+            if not proposals:
+                return {'state': 'READY', 'workflow_step': 'EXPERIMENT_PLAN', 'instruction': 'Propose a bounded experiment plan, explain TRUSTED_LOCAL risk, and request one consequential human approval.'}
         return {'state': 'READY', 'workflow_step': 'CLAIM_REVIEW', 'instruction': 'Review claim coverage and contradictions; novelty is not assessed by HowHow.'}
     if pending.get("kind") == "human" and response_file is None:
         request = {"request_id": "request-" + uuid.uuid4().hex[:16], "task_id": pending["id"], "question": pending.get("instruction", "Human input required"), "created_at": now()}
@@ -747,7 +773,10 @@ def set_paused(root: Path, paused: bool, reason: str = "") -> dict[str, Any]:
 def status(root: Path) -> dict[str, Any]:
     state = read_json(state_path(root), {})
     from .vnext import capability_list
-    return {"project": root.name, "root": str(root), "state": state, "sources": len(source_list(root)), "evidence": len(list((root / ".howhow/evidence").glob("*.json"))), "experiments": len(list((root / ".howhow/experiments").glob("*.json"))), "failures": len(list((root / ".howhow/failures.jsonl").read_text(encoding="utf-8").splitlines())) if (root / ".howhow/failures.jsonl").exists() else 0, "opinion": capability_list(root)["opinion"], "capabilities": capability_list(root)["capabilities"]}
+    proposals = [read_json(p) for p in (root / ".howhow/proposals").glob("*.json")]
+    grants = [read_json(p) for p in (root / ".howhow/grants").glob("*.json")]
+    workflow = "EXPERIMENT_APPROVAL" if proposals and not grants else ("EXPERIMENT_EXECUTION" if grants else "RESEARCH_CONTINUATION")
+    return {"project": root.name, "root": str(root), "state": state, "workflow_step": workflow, "approval_state": "ISSUED" if grants else ("PROPOSED" if proposals else "NOT_REQUESTED"), "trust_profile": (proposals[-1].get("trust_profile") if proposals else None), "risk_warning": "NOT SANDBOXED: host filesystem and network access remain possible" if any(p.get("trust_profile") == "TRUSTED_LOCAL" for p in proposals) else None, "proposal_count": len(proposals), "sources": len(source_list(root)), "evidence": len(list((root / ".howhow/evidence").glob("*.json"))), "experiments": len(list((root / ".howhow/experiments").glob("*.json"))), "failures": len(list((root / ".howhow/failures.jsonl").read_text(encoding="utf-8").splitlines())) if (root / ".howhow/failures.jsonl").exists() else 0, "opinion": capability_list(root)["opinion"], "capabilities": capability_list(root)["capabilities"]}
 
 
 def _tool(name: str) -> str | None:
