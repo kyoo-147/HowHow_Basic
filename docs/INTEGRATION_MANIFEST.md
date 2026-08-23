@@ -1,6 +1,6 @@
 # Phase A pinned integration manifest
 
-All entries are fixture metadata, not live calls or copied code. License status remains `UNVERIFIED_PENDING_REVIEW` until an explicit license review. Use mode is `REFERENCE_ONLY` (skills are adapted only through HowHow contracts). wanshuiyin ARIS is current upstream authority; Randall ARIS is an older fork/compatibility snapshot.
+All entries are fixture metadata, not live calls or copied code. Each project manifest differentiates license status and concrete mode (`ADAPTED`, `ADAPTER_DISABLED`, `REFERENCE_ONLY`, `RESTRICTED`, or `BLOCKED`); every entry remains `NOT_CALLED` unless a bounded execution is actually retained. wanshuiyin ARIS is current upstream authority; Randall ARIS is an older fork/compatibility snapshot.
 
 | Repository | Exact SHA | Contract/use |
 |---|---|---|

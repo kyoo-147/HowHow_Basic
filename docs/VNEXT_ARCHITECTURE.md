@@ -15,6 +15,12 @@ Phase A is a project-local, standard-library Python thin vertical slice. The CLI
 
 ## Flow
 
-`start` -> inspect capabilities and sources -> propose/confirm brief -> add 3–5 gated ideas -> rank -> record user selection -> propose target -> confirm target -> add/audit claims -> human review. `continue` presents the next bounded step and never fabricates model-generated ideas.
+`start` -> inspect differentiated capabilities and source plan -> create a literature protocol -> ask consequential inclusion/access/license decisions -> import provisional candidates -> retain and verify evidence -> build a FOUNDATIONAL/NEAREST/SUPPORTING/CONTRADICTING matrix -> run contradiction and coverage audit -> propose/confirm brief -> add 3–5 gated ideas -> rank -> record user selection -> propose target -> confirm target -> add/audit claims -> human review. `continue` presents the next bounded step and never fabricates model-generated ideas.
+
+## Phase B literature provenance
+
+Literature records are project-local and append-only: protocols retain questions, claims, filters, cutoff, retrieval timestamps, candidate IDs, decisions/reasons, citation expansion, deduplication/version identity, correction/retraction status, and saturation rationale. A retained matrix entry must name retained source IDs and exact VERIFIED evidence IDs; metadata-only entries remain `UNVERIFIED`. The audit checks explicit coverage or unresolved status for every protocol question and records contradiction-search scope without paper-count novelty claims.
+
+The optional gpt-researcher adapter exports only bounded requests and imports provisional URLs/document IDs/query receipts. Re-fetching, licenses, source retention, transformed-text extraction, and evidence verification remain HowHow-owned. Extracted text stores the parent source hash plus independently hashed bytes, extractor/version/config, page mapping, and locators; missing or mutated parents/derived bytes fail closed. Binary PDF offsets are never evidence locators.
 
 The existing experiment runner is `TRUSTED_LOCAL`, not a security sandbox. Live adapters and full-text work are deferred.

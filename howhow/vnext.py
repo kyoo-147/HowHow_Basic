@@ -31,7 +31,37 @@ def opinion_state(root):
 
 def init_vnext(root):
     (root / 'OPINION.md').write_bytes(b'')
-    entries = [{'name': n, 'sha': s, 'license_status': 'UNVERIFIED_PENDING_REVIEW', 'use_mode': 'REFERENCE_ONLY', 'howhow_contract': 'pinned integration manifest; no code copied', 'artifact': 'fixture manifest entry', 'fixture_provenance': 'Phase A deterministic fixture; supplied approval pin', 'conformance_test': 'manifest shape, exact SHA, license gate', 'live_status': 'NOT_CALLED'} for n, s, _ in REPOS]
+    modes = {
+        'wanshuiyin ARIS': ('PINNED_REVIEWED', 'ADAPTED', True),
+        'Randall ARIS': ('PINNED_REVIEWED', 'ADAPTER_DISABLED', False),
+        'AI-Researcher': ('REFERENCE_REVIEWED', 'REFERENCE_ONLY', False),
+        'AgentLaboratory': ('REFERENCE_REVIEWED', 'REFERENCE_ONLY', False),
+        'AI-Scientist': ('RESTRICTED_REVIEW', 'RESTRICTED', False),
+        'gpt-researcher': ('REFERENCE_REVIEWED', 'ADAPTER_DISABLED', False),
+        'deer-flow': ('UNVERIFIED', 'REFERENCE_ONLY', False),
+        'sciagent': ('UNVERIFIED', 'REFERENCE_ONLY', False),
+        'autoresearch': ('UNVERIFIED', 'BLOCKED', False),
+        'Academic-Paper-Skills': ('PINNED_REVIEWED', 'ADAPTED', True),
+        'latex-arxiv-SKILL': ('PINNED_REVIEWED', 'ADAPTED', True),
+        'OpenScholar': ('REFERENCE_REVIEWED', 'REFERENCE_ONLY', False),
+        'DeepScientist': ('RESTRICTED_REVIEW', 'RESTRICTED', False),
+    }
+    contracts = {
+        'wanshuiyin ARIS': ('reviewed upstream workflow inputs', 'bounded workflow plan and review gates', 'no execution or code import'),
+        'Randall ARIS': ('pinned compatibility comparison', 'comparison notes only', 'older fork; adapter disabled'),
+        'AI-Researcher': ('research task and evidence plan', 'reference workflow concepts', 'reference-only; no calls'),
+        'AgentLaboratory': ('agent workflow stages', 'reference stage mapping', 'reference-only; no calls'),
+        'AI-Scientist': ('experiment lifecycle shape', 'restricted lifecycle notes', 'restricted review; no execution'),
+        'gpt-researcher': ('bounded query, limit, offline flag', 'provisional candidate metadata contract', 'adapter request only; live false'),
+        'deer-flow': ('orchestration concepts', 'reference orchestration notes', 'reference-only; no calls'),
+        'sciagent': ('literature workflow concepts', 'reference workflow notes', 'reference-only; no calls'),
+        'autoresearch': ('experiment loop concepts', 'reference experiment notes', 'blocked pending review'),
+        'Academic-Paper-Skills': ('paper structure and evidence checklist', 'adapted checklist artifact', 'adapted skill; no copied code'),
+        'latex-arxiv-SKILL': ('local build and package constraints', 'adapted build checklist', 'adapted skill; no submission'),
+        'OpenScholar': ('literature synthesis concepts', 'reference synthesis notes', 'reference-only; no calls'),
+        'DeepScientist': ('research planning concepts', 'restricted planning notes', 'restricted review; no execution'),
+    }
+    entries = [{'name': n, 'sha': s, 'license_status': modes[n][0], 'use_mode': modes[n][1], 'enabled': modes[n][2], 'howhow_contract': contracts[n][0], 'artifact': contracts[n][1], 'limitations': contracts[n][2], 'fixture_provenance': 'Phase A deterministic fixture; supplied approval pin', 'conformance_test': 'exact repository, SHA, license, mode, and live boundary', 'live_status': 'NOT_CALLED'} for n, s, _ in REPOS]
     value = {'schema_version': 1, 'lineage': 'wanshuiyin ARIS is current upstream authority; Randall ARIS is an older fork/compatibility snapshot', 'integrations': entries}
     atomic_json(root / '.howhow/integration-manifest.json', value)
     atomic_json(root / 'integrations-manifest.json', value)
@@ -39,7 +69,7 @@ def init_vnext(root):
 def capabilities(root):
     manifest = root / '.howhow/integration-manifest.json'
     entries = json.loads(manifest.read_text(encoding='utf-8'))['integrations'] if manifest.exists() else []
-    return [{'id': 'integration-' + safe_id(item['name'].lower().replace(' ', '-').replace('_', '-')), 'name': item['name'], 'status': 'REFERENCE_ONLY', 'enabled': False, 'live': False, 'sources': [item['name']], 'license_status': item['license_status'], 'sha': item['sha']} for item in entries]
+    return [{'id': 'integration-' + safe_id(item['name'].lower().replace(' ', '-').replace('_', '-')), 'name': item['name'], 'status': item.get('use_mode', 'REFERENCE_ONLY'), 'enabled': item.get('enabled', False), 'live': item.get('live_status') == 'CALLED', 'sources': [item['name']], 'license_status': item['license_status'], 'sha': item['sha'], 'live_status': item.get('live_status', 'NOT_CALLED')} for item in entries]
 
 def capability_list(root): return {'capabilities': capabilities(root), 'opinion': opinion_state(root)}
 def capability_inspect(root, identifier):
@@ -119,8 +149,33 @@ def _intact(record, identifier):
     return record.get('id') == identifier and digest == sha256_bytes(canonical(unsigned))
 
 def vnext_audit(root):
-    """Validate persisted Phase A records without changing them."""
+    """Validate every persisted Phase A/B record without changing it."""
     issues = []
+    manifest = root / '.howhow/integration-manifest.json'
+    if manifest.exists():
+        try:
+            data = json.loads(manifest.read_text(encoding='utf-8'))
+            expected = {name: sha for name, sha, _ in REPOS}
+            entries = data.get('integrations', [])
+            if len(entries) != len(REPOS) or len({item.get('name') for item in entries}) != len(entries): issues.append('integration manifest must contain exactly one entry per pinned repository')
+            if {item.get('name') for item in entries} != set(expected): issues.append('integration manifest repository names do not match REPOS')
+            for item in entries:
+                name = item.get('name')
+                if item.get('sha') != expected.get(name) or not isinstance(item.get('sha'), str) or len(item['sha']) != 40: issues.append(str(name) + ': invalid repository pin')
+                if not isinstance(item.get('license_status'), str) or item.get('license_status') not in {'PINNED_REVIEWED','REFERENCE_REVIEWED','RESTRICTED_REVIEW','UNVERIFIED'}: issues.append(str(name) + ': invalid license status')
+                if item.get('use_mode') not in {'ADAPTED','ADAPTER_DISABLED','REFERENCE_ONLY','RESTRICTED','BLOCKED'} or item.get('enabled') is not (item.get('use_mode') == 'ADAPTED'): issues.append(str(name) + ': invalid mode/enabled state')
+                if not item.get('howhow_contract') or not item.get('artifact') or not item.get('limitations'): issues.append(str(name) + ': incomplete concrete contract')
+                if item.get('live_status') != 'NOT_CALLED': issues.append(str(name) + ': live boundary violated')
+            duplicate = root / 'integrations-manifest.json'
+            if duplicate.exists() and duplicate.read_bytes() != manifest.read_bytes(): issues.append('duplicate root integration manifest differs')
+        except (OSError, ValueError, TypeError):
+            issues.append('integration manifest unreadable')
+    for folder in ('briefs', 'ideas', 'rankings', 'selections', 'targets'):
+        for path in d(root, folder).glob('*.json'):
+            try:
+                record = json.loads(path.read_text(encoding='utf-8'))
+                if path.stem != record.get('id') or not _intact(record, path.stem): issues.append(path.name + ': immutable hash or filename/id mismatch')
+            except (OSError, ValueError, TypeError): issues.append(path.name + ': unreadable record')
     for path in d(root, 'briefs').glob('*.json'):
         record = json.loads(path.read_text())
         if not isinstance(record.get('title'), str) or not record.get('title') or record.get('mode') not in ('Manual', 'Hybrid', 'Auto') or record.get('status') not in ('PROPOSED', 'CONFIRMED'):
@@ -130,6 +185,8 @@ def vnext_audit(root):
         except SystemExit as exc: issues.append(path.name + ': ' + str(exc))
     claims = claim_audit(root)
     issues.extend(claims['issues'])
+    from .literature import audit as literature_audit
+    issues.extend('literature: ' + issue for issue in literature_audit(root)['issues'])
     return {'passed': not issues, 'issues': issues}
 
 def idea_add_validation(value):

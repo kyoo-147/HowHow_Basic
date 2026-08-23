@@ -14,6 +14,7 @@ from .core import (
 from .reviews import add as add_review, audit as audit_reviews, status as review_status
 from .vnext import (brief_confirm, brief_propose, brief_show, capability_inspect, capability_list,
     claim_add, claim_audit, idea_add, idea_rank, idea_select, target_confirm, target_propose)
+from .literature import add_matrix, add_transformed, audit as audit_literature, candidate_adapter_request, create_protocol, decide_candidate, import_candidate
 
 
 def emit(value: object) -> None:
@@ -108,6 +109,14 @@ def parser() -> argparse.ArgumentParser:
     tp=tsub.add_parser("propose"); tp.add_argument("idea_id"); tp.add_argument("--words",type=int,default=0); tp.add_argument("--pages",type=int,default=0); tp.add_argument("--figures",type=int,default=0); tp.add_argument("--tables",type=int,default=0); tp.add_argument("--rationale",default="")
     tc=tsub.add_parser("confirm"); tc.add_argument("id"); tc.add_argument("decision")
     claims=sub.add_parser("claim"); csub=claims.add_subparsers(dest="claim_command",required=True); ca=csub.add_parser("add"); ca.add_argument("file"); csub.add_parser("audit")
+    lit = sub.add_parser("literature"); lsub = lit.add_subparsers(dest="literature_command", required=True)
+    lp=lsub.add_parser("protocol"); lp.add_argument("file")
+    lc=lsub.add_parser("candidate-import"); lc.add_argument("file")
+    ld=lsub.add_parser("decide"); ld.add_argument("candidate_id"); ld.add_argument("decision"); ld.add_argument("reason"); ld.add_argument("--source-id")
+    lm=lsub.add_parser("matrix"); lm.add_argument("file")
+    lt=lsub.add_parser("transform"); lt.add_argument("file"); lt.add_argument("extracted")
+    lsub.add_parser("audit")
+    la=lsub.add_parser("adapter-request"); la.add_argument("provider"); la.add_argument("query"); la.add_argument("--limit", type=int, default=10)
     return p
 
 
@@ -129,7 +138,7 @@ def main(argv: list[str] | None = None) -> int:
             if args.plan_command == "save": emit(save_plan(root, Path(args.file)))
             else: emit(json.loads((root / ".howhow/plan.json").read_text(encoding="utf-8")))
         elif args.command == "start":
-            emit({"mode": args.mode, "capabilities": capability_list(root), "sources": json.loads((root / ".howhow/integration-manifest.json").read_text(encoding="utf-8")), "steps": ["inspect capabilities", "propose/confirm brief", "rank 3-5 gated ideas", "select idea and confirm target", "build claim map, then human review"]})
+            emit({"mode": args.mode, "capabilities": capability_list(root), "sources": json.loads((root / ".howhow/integration-manifest.json").read_text(encoding="utf-8")), "steps": ["inspect capabilities and source plan", "create literature protocol and resolve consequential inclusion/access/license decisions", "expand, deduplicate, and retain exact evidence", "build literature matrix and contradiction/coverage audit", "propose/confirm brief, then ideate and human review"]})
         elif args.command == "continue":
             continuation = continue_project(root, Path(args.response_file) if args.response_file else None)
             continuation.update({"mode": args.mode, "capabilities": capability_list(root)})
@@ -144,6 +153,14 @@ def main(argv: list[str] | None = None) -> int:
             emit(target_propose(root,args.idea_id,args.words,args.pages,args.figures,args.tables,args.rationale) if args.target_command == "propose" else target_confirm(root,args.id,args.decision))
         elif args.command == "claim":
             emit(claim_add(root,json.loads(Path(args.file).read_text(encoding="utf-8"))) if args.claim_command == "add" else claim_audit(root))
+        elif args.command == "literature":
+            if args.literature_command == "protocol": emit(create_protocol(root, json.loads(Path(args.file).read_text(encoding="utf-8"))))
+            elif args.literature_command == "candidate-import": emit(import_candidate(root, json.loads(Path(args.file).read_text(encoding="utf-8"))))
+            elif args.literature_command == "decide": emit(decide_candidate(root, args.candidate_id, args.decision, args.reason, args.source_id))
+            elif args.literature_command == "matrix": emit(add_matrix(root, json.loads(Path(args.file).read_text(encoding="utf-8"))))
+            elif args.literature_command == "transform": emit(add_transformed(root, json.loads(Path(args.file).read_text(encoding="utf-8")), Path(args.extracted)))
+            elif args.literature_command == "adapter-request": emit(candidate_adapter_request(args.provider, args.query, args.limit))
+            else: emit(audit_literature(root))
         elif args.command == "status":
             emit(status(root))
         elif args.command == "pause": emit(set_paused(root, True, args.reason))

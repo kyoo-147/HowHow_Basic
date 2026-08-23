@@ -346,6 +346,7 @@ def add_evidence(root: Path, descriptor: Path) -> dict[str, Any]:
 
 def audit_evidence(root: Path, strict: bool = False) -> dict[str, Any]:
     sources = {item["source_id"]: item for item in source_list(root)}
+    transformed = {p.stem: read_json(p) for p in (root / ".howhow/literature/transformed").glob("*.json")}
     records = [read_json(p) for p in sorted((root / ".howhow/evidence").glob("*.json"))]
     issues: list[str] = []
     checked = 0
@@ -356,20 +357,22 @@ def audit_evidence(root: Path, strict: bool = False) -> dict[str, Any]:
         if not digest or digest != sha256_bytes(canonical(unsigned)):
             issues.append(f"{evidence_id}: evidence record hash mismatch")
         sid = record.get("source_id")
-        source = sources.get(sid)
-        if record.get("status") == "VERIFIED" and (not sid or not source or not record.get("quote") or not isinstance(record.get("locator"), dict)):
-            issues.append(f"{record.get('id')}: VERIFIED evidence requires source, quote, and locator")
+        transformed_id = record.get("transformed_source_id")
+        source = sources.get(sid) if sid else None
+        derived = transformed.get(transformed_id) if transformed_id else None
+        if record.get("status") == "VERIFIED" and ((not source and not derived) or (source and derived) or not record.get("quote") or not isinstance(record.get("locator"), dict)):
+            issues.append(f"{record.get('id')}: VERIFIED evidence requires exactly one source/derived source, quote, and locator")
         if record.get("status") == "VERIFIED" and ("claim" in record or "run_id" in record) and not isinstance(record.get("run_id"), str):
             issues.append(f"{record.get('id')}: VERIFIED evidence requires run_id")
         if sid and source:
             payload = root / ".howhow/sources/raw" / sid / "payload"
             if not payload.exists() or sha256_file(payload) != source.get("sha256"):
                 issues.append(f"{record.get('id')}: source hash mismatch")
+            text = payload.read_bytes().decode("utf-8", errors="replace") if payload.exists() else ""
             locator = record.get("locator", {})
             if record.get("status") == "VERIFIED" and not {"char_start", "char_end"} <= set(locator):
                 issues.append(f"{record.get('id')}: VERIFIED evidence requires exact char_start and char_end")
             if "char_start" in locator and "char_end" in locator:
-                text = payload.read_bytes().decode("utf-8", errors="replace")
                 start, end = locator["char_start"], locator["char_end"]
                 if type(start) is not int or type(end) is not int or not (0 <= start <= end <= len(text)):
                     issues.append(f"{record.get("id")}: invalid evidence span")
@@ -379,6 +382,23 @@ def audit_evidence(root: Path, strict: bool = False) -> dict[str, Any]:
                     issues.append(f"{record.get('id')}: quote does not match source span")
                 if record.get("status") == "VERIFIED":
                     checked += 1
+        if transformed_id and derived:
+            extracted = root / ".howhow/literature" / derived.get("extracted_path", "")
+            parent_id = derived.get("parent_source_id")
+            parent = sources.get(parent_id)
+            raw = root / ".howhow/sources/raw" / str(parent_id) / "payload"
+            if not parent or not raw.exists() or sha256_file(raw) != parent.get("sha256") or parent.get("sha256") != derived.get("original_sha256"):
+                issues.append(f"{record.get('id')}: transformed parent integrity failed")
+            if not extracted.exists() or sha256_file(extracted) != derived.get("extracted_sha256"):
+                issues.append(f"{record.get('id')}: transformed text integrity failed")
+            locator = record.get("locator", {})
+            if record.get("status") == "VERIFIED" and not {"char_start", "char_end"} <= set(locator):
+                issues.append(f"{record.get('id')}: derived VERIFIED evidence requires exact char_start and char_end")
+            if {"char_start", "char_end"} <= set(locator) and extracted.exists():
+                text = extracted.read_bytes().decode("utf-8", errors="replace")
+                start, end = locator["char_start"], locator["char_end"]
+                if type(start) is not int or type(end) is not int or not (0 <= start <= end <= len(text)) or text[start:end] != record.get("quote", ""):
+                    issues.append(f"{record.get('id')}: quote does not match transformed text span")
         if record.get("status") == "VERIFIED" and isinstance(record.get("run_id"), str):
             run_id = record["run_id"]
             try:
@@ -647,7 +667,19 @@ def continue_project(root: Path, response_file: Path | None = None) -> dict[str,
     completed = set(state.get("completed_tasks", []))
     pending = next((task for task in tasks if task["id"] not in completed), None)
     if pending is None:
-        return finalize_project(root)
+        if (root / '.howhow/plan.json').exists():
+            return finalize_project(root)
+        literature = root / '.howhow/literature'
+        protocol_count = len(list((literature / 'protocols').glob('*.json'))) if literature.exists() else 0
+        candidate_count = len(list((literature / 'candidates').glob('*.json'))) if literature.exists() else 0
+        matrix_count = len(list((literature / 'matrix').glob('*.json'))) if literature.exists() else 0
+        if protocol_count == 0:
+            return {'state': 'READY', 'workflow_step': 'SOURCE_AND_PROTOCOL', 'instruction': 'Review permitted sources, then create a literature protocol with executed bounded queries, receipts, contradiction search, and a substantiated stopping test.'}
+        if candidate_count == 0:
+            return {'state': 'READY', 'workflow_step': 'CANDIDATE_REVIEW', 'instruction': 'Import only bounded adapter candidates linked to this protocol, then record inclusion/access/license decisions.'}
+        if matrix_count == 0:
+            return {'state': 'READY', 'workflow_step': 'EVIDENCE_AND_MATRIX', 'instruction': 'Retain exact evidence, verify it, build the source/evidence matrix, and run the literature audit.'}
+        return {'state': 'READY', 'workflow_step': 'CLAIM_REVIEW', 'instruction': 'Review claim coverage and contradictions; novelty is not assessed by HowHow.'}
     if pending.get("kind") == "human" and response_file is None:
         request = {"request_id": "request-" + uuid.uuid4().hex[:16], "task_id": pending["id"], "question": pending.get("instruction", "Human input required"), "created_at": now()}
         request_path = root / ".howhow/runs" / pending["id"] / "request.json"
