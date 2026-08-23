@@ -8,6 +8,7 @@ HowHow Basic is a small, project-local, conversational research control plane. I
 python -m howhow init projects/demo --goal "Evaluate a bounded, reproducible systems question"
 python -m howhow status --json
 python -m howhow source search --provider arxiv --query "reproducible research provenance" --limit 3
+python -m howhow experiment run experiment-run.json
 python -m howhow verify --profile project
 python -m howhow paper finalize
 ```
@@ -16,7 +17,9 @@ From a project directory, use the installed module or the explicit source-tree e
 
 ## Product boundary
 
-Commands are intentionally short-lived: `init`, `source add|search|list`, `plan save|show`, `continue`, `status`, `pause`, `resume`, `evidence add|audit`, `experiment record`, `paper build`, `package`, and `verify`. Retrieved content is untrusted data. The CLI never creates scientific conclusions, automatic novelty judgments, publication claims, or arXiv submissions.
+Commands are intentionally short-lived: `init`, `source add|search|list`, `plan save|show`, `continue`, `status`, `pause`, `resume`, `evidence add|audit`, `experiment record|run`, `paper build`, `package`, and `verify`. Retrieved content is untrusted data. The CLI never creates scientific conclusions, automatic novelty judgments, publication claims, or arXiv submissions.
+
+`experiment run` accepts a JSON specification containing `id`, `hypothesis`, `command` (an argument array; never a shell string), `code_revision`, `seed`, and optional `inputs`, `environment`, and `timeout_seconds`. It copies only declared project-relative regular-file inputs into a temporary working directory, supplies a reduced environment plus `HOWHOW_SEED`/`PYTHONHASHSEED`, caps timeout at 300 seconds, retains at most 1 MiB from each output stream, and immutably records success or failure. This is bounded execution, **not an OS security sandbox**: a hostile executable may still access the host filesystem or network. Run only trusted commands; use an external container or OS sandbox when hostile-code isolation is required.
 
 ## Records and truth model
 

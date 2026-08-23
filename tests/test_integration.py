@@ -28,6 +28,18 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(state["state"]["state"], "PAUSED")
         run_in_project("resume")
         self.assertTrue((root / ".howhow/events.jsonl").exists())
+        runner = root / "runner.py"
+        runner.write_text("import os; print('seed=' + os.environ['HOWHOW_SEED'])\n", encoding="utf-8")
+        experiment = root / "experiment-run.json"
+        experiment.write_text(json.dumps({
+            "id": "cli-bounded-run", "hypothesis": "the declared seed is injected",
+            "command": [sys.executable, "runner.py"], "code_revision": "integration-fixture", "seed": 23,
+            "inputs": ["runner.py"], "timeout_seconds": 5,
+        }), encoding="utf-8")
+        recorded = json.loads(run_in_project("experiment", "run", "experiment-run.json").stdout)
+        self.assertEqual(recorded["status"], "SUCCESS")
+        self.assertEqual(recorded["raw_observations"][0]["stdout"].splitlines(), ["seed=23"])
+        self.assertTrue((root / ".howhow/experiments/cli-bounded-run.json").is_file())
 
     @unittest.skipUnless(__import__("shutil").which("pdflatex") and __import__("shutil").which("bibtex"), "LaTeX toolchain required")
     def test_claimledger_full_finalization_rebuilds_source_package(self):

@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
+import os
+import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from howhow.core import (
-    add_evidence, audit_evidence, init_project, record_experiment, save_plan,
+    add_evidence, audit_evidence, init_project, record_experiment, run_experiment, save_plan,
     source_add, verify_event_chain, continue_project, render_record_paper,
 )
 
@@ -180,6 +183,58 @@ class HowHowProductTests(unittest.TestCase):
         self.assertTrue(verify_event_chain(self.root))
         with self.assertRaises(SystemExit):
             record_experiment(self.root, record)
+
+    def test_bounded_experiment_run_records_declared_inputs_environment_and_seed(self):
+        script = self.root / "runner.py"
+        script.write_text(
+            "import json, os\n"
+            "data = open('input.txt', encoding='utf-8').read()\n"
+            "open('temporary-output.txt', 'w', encoding='utf-8').write('isolated')\n"
+            "print(json.dumps({'data': data, 'declared': os.environ.get('DECLARED'), "
+            "'seed': os.environ.get('HOWHOW_SEED'), 'parent': os.environ.get('HOWHOW_PARENT_SECRET')}))\n",
+            encoding="utf-8",
+        )
+        (self.root / "input.txt").write_text("fixture", encoding="utf-8")
+        spec = self.tmp / "run-spec.json"
+        spec.write_text(json.dumps({
+            "id": "bounded-run-1", "hypothesis": "declared fixture is readable",
+            "command": [sys.executable, "runner.py"], "code_revision": "fixture-revision", "seed": 17,
+            "inputs": ["runner.py", "input.txt"], "environment": {"DECLARED": "yes"}, "timeout_seconds": 5,
+        }), encoding="utf-8")
+        with patch.dict(os.environ, {"HOWHOW_PARENT_SECRET": "must-not-leak"}):
+            record = run_experiment(self.root, spec)
+        self.assertEqual(record["status"], "SUCCESS")
+        observation = json.loads(record["raw_observations"][0]["stdout"])
+        self.assertEqual(observation, {"data": "fixture", "declared": "yes", "seed": "17", "parent": None})
+        self.assertFalse((self.root / "temporary-output.txt").exists())
+        self.assertEqual([item["path"] for item in record["inputs"]], ["runner.py", "input.txt"])
+        self.assertFalse(record["runner"]["host_access_prevented"])
+        self.assertTrue(verify_event_chain(self.root))
+
+    def test_bounded_experiment_run_preserves_nonzero_exit_as_failure(self):
+        spec = self.tmp / "failed-run-spec.json"
+        spec.write_text(json.dumps({
+            "id": "bounded-run-failed", "hypothesis": "negative control exits nonzero",
+            "command": [sys.executable, "-c", "import sys; print('negative control'); sys.exit(7)"],
+            "code_revision": "fixture-revision", "seed": 3, "timeout_seconds": 5,
+        }), encoding="utf-8")
+        record = run_experiment(self.root, spec)
+        self.assertEqual(record["status"], "FAILED")
+        self.assertEqual(record["raw_observations"][0]["exit_status"], 7)
+        self.assertEqual(record["error"], "command exited with status 7")
+        self.assertIn("negative control", record["raw_observations"][0]["stdout"])
+        self.assertTrue((self.root / ".howhow/failures.jsonl").exists())
+
+        timeout_spec = self.tmp / "timeout-run-spec.json"
+        timeout_spec.write_text(json.dumps({
+            "id": "bounded-run-timeout", "hypothesis": "timeout control is enforced",
+            "command": [sys.executable, "-c", "import time; time.sleep(2)"],
+            "code_revision": "fixture-revision", "seed": 3, "timeout_seconds": 0.05,
+        }), encoding="utf-8")
+        timed_out = run_experiment(self.root, timeout_spec)
+        self.assertEqual(timed_out["status"], "FAILED")
+        self.assertTrue(timed_out["raw_observations"][0]["timed_out"])
+        self.assertIn("timed out", timed_out["error"])
 
     def test_plan_requires_unique_ids(self):
         plan = self.tmp / "plan.json"

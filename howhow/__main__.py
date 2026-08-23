@@ -8,7 +8,7 @@ from pathlib import Path
 from . import __version__
 from .core import (
     add_evidence, audit_evidence, build_paper, continue_project, init_project,
-    package_paper, project_root, record_experiment, save_plan, set_paused,
+    package_paper, project_root, record_experiment, run_experiment, save_plan, set_paused,
     source_add, source_inspect, source_list, source_pin, source_search, source_use, status, verify_project, render_record_paper, finalize_project,
 )
 from .reviews import add as add_review, audit as audit_reviews, status as review_status
@@ -68,6 +68,8 @@ def parser() -> argparse.ArgumentParser:
     expsub = exp.add_subparsers(dest="experiment_command", required=True)
     er = expsub.add_parser("record")
     er.add_argument("file")
+    run = expsub.add_parser("run", help="run a bounded command from a JSON specification and retain its immutable result")
+    run.add_argument("file")
     review = sub.add_parser("review")
     reviewsub = review.add_subparsers(dest="review_command", required=True)
     ra = reviewsub.add_parser("add")
@@ -116,7 +118,10 @@ def main(argv: list[str] | None = None) -> int:
             result = add_evidence(root, Path(args.file)) if args.evidence_command == "add" else audit_evidence(root, args.strict)
             emit(result)
             if args.evidence_command == "audit" and args.strict and not result["passed"]: return 1
-        elif args.command == "experiment": emit(record_experiment(root, Path(args.file)))
+        elif args.command == "experiment":
+            result = record_experiment(root, Path(args.file)) if args.experiment_command == "record" else run_experiment(root, Path(args.file))
+            emit(result)
+            if args.experiment_command == "run" and result["status"] == "FAILED": return 1
         elif args.command == "review":
             if args.review_command == "add": emit(add_review(root, Path(args.file)))
             elif args.review_command == "audit":

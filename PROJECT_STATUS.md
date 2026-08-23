@@ -1,10 +1,10 @@
 # HowHow Basic status
 
-Updated 2026-08-23 after adding clean-room source-package rebuild validation.
+Updated 2026-08-23 after adding bounded local experiment execution.
 
 ## Evidence-backed completion
 
-**Overall MVP completion: 95% (implemented product and deterministic/local acceptance).** This percentage is a capability estimate, not scientific acceptance. Against the broader autonomous research-to-LaTeX acceptance, the product remains partial because task execution and scientific review are intentionally human-owned.
+**Overall MVP completion: 97% (implemented product and deterministic/local acceptance).** This percentage is a capability estimate, not scientific acceptance. Against the broader autonomous research-to-LaTeX acceptance, the product remains partial because hostile-code sandboxing and scientific review are intentionally outside the local CLI.
 
 | Capability | Status | Evidence |
 |---|---|---|
@@ -19,12 +19,12 @@ Updated 2026-08-23 after adding clean-room source-package rebuild validation.
 | Claims/reviews/gates and truthful readiness | PARTIAL | claim map and machine review report exist; strict verification audits immutable review hash chains and revalidates retained source spans and experiment integrity; no human scientific review, novelty decision, or external submission |
 | Parallel Pi-subagent waves | PARTIAL | role prompts and development schedule exist; product has no hidden worker and no live multi-agent wave evidence |
 | Full API adapter matrix (arXiv, OpenAlex, Crossref, Semantic Scholar) | PARTIAL | OpenAlex live retrieval and arXiv search adapter implemented; Crossref/S2 remain future adapters |
-| Sandboxed arbitrary experiment execution | NOT IMPLEMENTED | records are accepted; the CLI intentionally does not add a hidden runner/daemon |
+| Bounded arbitrary experiment execution | VERIFIED_DETERMINISTIC_PARTIAL | `experiment run` uses an argument array without a shell, a temporary working directory containing declared hashed inputs, reduced environment, explicit seed, timeout, and retained-output limits; success and failure become immutable records. It is not an OS sandbox and does not prevent host filesystem or network access. |
 
 
 ## Completion boundaries (evidence-backed)
 
-- **Implemented product:** 95%; locking, bounded local/HTTP source reads, redirect fail-closed checks, exact VERIFIED spans, evidence descriptor and claim-to-run integrity checks, review-target revalidation, scaffold-safe LaTeX rendering, and reproducibility supplements are implemented and tested.
+- **Implemented product:** 97%; locking, bounded local/HTTP source reads, redirect fail-closed checks, exact VERIFIED spans, evidence descriptor and claim-to-run integrity checks, bounded local experiment execution, review-target revalidation, scaffold-safe LaTeX rendering, and reproducibility supplements are implemented and tested.
 - **Deterministic E2E:** 100% of the bounded ClaimLedger demonstration; a clean-copy integration test executes render, strict verification, manuscript build, package creation, safe extraction, and clean-room recompilation. The strict verification includes a passing `reviews` audit with **0 immutable review records** and reports `READY_FOR_HUMAN_REVIEW`. The empty audit confirms no broken review chain; it is not human scientific review or acceptance.
 - **Scientific human review:** 0% complete; human inspection of claims, limitations, novelty, and correctness remains required.
 - **External submission:** 0%; no submission or publication action was performed.
@@ -56,7 +56,7 @@ The final exact product verdict is `READY_FOR_HUMAN_REVIEW`. It means the determ
 ## Residual gaps
 
 - Human review and direction/novelty/correctness judgment remain required later; the committed demo has 0 immutable human-review records, so the passing empty audit must not be read as completed review.
-- The product does not yet provide a sandboxed arbitrary-code runner or statistical uncertainty engine. Independent immutable review records provide claim/evidence-bound findings, and strict project verification now includes their hash-chain and retained-target integrity audit as a named `reviews` check.
+- The bounded runner is not an OS security sandbox: trusted commands may still access host files and the network, and child-process-tree teardown is not independently enforced. Hostile-code isolation and a statistical uncertainty engine remain unimplemented. Independent immutable review records provide claim/evidence-bound findings, and strict project verification includes their hash-chain and retained-target integrity audit as a named `reviews` check.
 - Crossref and Semantic Scholar adapters and full claim-linter coverage are future work. Source archive extraction, member-hash validation, and clean-room LaTeX recompilation are now part of finalization and CI.
 - The experiment uses one short local fixture, one mutation, and one repetition; timing is descriptive only.
 

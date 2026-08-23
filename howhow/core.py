@@ -40,6 +40,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 import urllib.parse
 import urllib.request
 import uuid
@@ -413,6 +414,160 @@ def audit_evidence(root: Path, strict: bool = False) -> dict[str, Any]:
 
 
 EXPERIMENT_REQUIRED_FIELDS = ("id", "hypothesis", "command", "status", "raw_observations", "metrics", "code_revision", "seed")
+EXPERIMENT_SPEC_REQUIRED_FIELDS = ("id", "hypothesis", "command", "code_revision", "seed")
+MAX_EXPERIMENT_INPUT_BYTES = 8 * 1024 * 1024
+MAX_EXPERIMENT_OUTPUT_BYTES = 1024 * 1024
+MAX_EXPERIMENT_TIMEOUT_SECONDS = 300
+ENV_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _experiment_input(root: Path, relative: str) -> tuple[Path, Path]:
+    if not isinstance(relative, str) or not relative or Path(relative).is_absolute():
+        raise SystemExit("experiment inputs must be non-empty project-relative paths")
+    candidate = root / relative
+    source = candidate.resolve()
+    try:
+        destination = source.relative_to(root.resolve())
+    except ValueError as exc:
+        raise SystemExit(f"experiment input escapes project: {relative}") from exc
+    if candidate.is_symlink() or not source.is_file():
+        raise SystemExit(f"experiment input must be a regular non-symlink file: {relative}")
+    return source, destination
+
+
+def run_experiment(root: Path, spec_path: Path) -> dict[str, Any]:
+    """Execute one declared command in an isolated temporary working directory.
+
+    This is a bounded local runner, not an OS security sandbox: it limits time,
+    retained output, working directory contents, and inherited environment, but
+    cannot prevent a hostile executable from accessing the host or network.
+    """
+    spec = read_json(spec_path)
+    if not isinstance(spec, dict):
+        raise SystemExit("experiment run specification must be a JSON object")
+    missing = [key for key in EXPERIMENT_SPEC_REQUIRED_FIELDS if key not in spec]
+    if missing:
+        raise SystemExit("experiment run specification missing: " + ", ".join(missing))
+    experiment_id = safe_id(spec["id"], "experiment id")
+    if (root / ".howhow/experiments" / f"{experiment_id}.json").exists():
+        raise SystemExit("experiment records are immutable; use a new id")
+    command = spec["command"]
+    if not isinstance(command, list) or not command or not all(isinstance(part, str) and part for part in command):
+        raise SystemExit("experiment command must be a non-empty array of strings")
+    if not isinstance(spec["hypothesis"], str) or not spec["hypothesis"].strip():
+        raise SystemExit("experiment hypothesis must be a non-empty string")
+    if not isinstance(spec["code_revision"], str) or not spec["code_revision"].strip():
+        raise SystemExit("experiment code_revision must be a non-empty string")
+    if isinstance(spec["seed"], bool) or not isinstance(spec["seed"], int) or not 0 <= spec["seed"] <= 4294967295:
+        raise SystemExit("experiment seed must be an integer from 0 through 4294967295")
+    inputs = spec.get("inputs", [])
+    if not isinstance(inputs, list) or not all(isinstance(item, str) for item in inputs):
+        raise SystemExit("experiment inputs must be an array of project-relative paths")
+    if len(set(inputs)) != len(inputs):
+        raise SystemExit("experiment inputs must be unique")
+    timeout = spec.get("timeout_seconds", 60)
+    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout <= 0 or timeout > MAX_EXPERIMENT_TIMEOUT_SECONDS:
+        raise SystemExit(f"experiment timeout_seconds must be > 0 and <= {MAX_EXPERIMENT_TIMEOUT_SECONDS}")
+    declared_env = spec.get("environment", {})
+    if not isinstance(declared_env, dict) or not all(
+        isinstance(key, str) and ENV_NAME.fullmatch(key) and isinstance(value, str)
+        for key, value in declared_env.items()
+    ):
+        raise SystemExit("experiment environment must map valid variable names to strings")
+    reserved = {"HOWHOW_SEED", "PYTHONHASHSEED", "TEMP", "TMP"}
+    if reserved.intersection(declared_env):
+        raise SystemExit("experiment environment cannot override HOWHOW_SEED, PYTHONHASHSEED, TEMP, or TMP")
+
+    resolved_inputs: list[tuple[Path, Path]] = []
+    total_input_bytes = 0
+    for item in inputs:
+        source, relative = _experiment_input(root, item)
+        total_input_bytes += source.stat().st_size
+        if total_input_bytes > MAX_EXPERIMENT_INPUT_BYTES:
+            raise SystemExit(f"experiment inputs exceed {MAX_EXPERIMENT_INPUT_BYTES} bytes")
+        resolved_inputs.append((source, relative))
+
+    with tempfile.TemporaryDirectory(prefix="howhow-experiment-") as temp:
+        work = Path(temp)
+        input_manifest = []
+        for source, relative in resolved_inputs:
+            destination = work / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, destination)
+            input_manifest.append({"path": relative.as_posix(), "bytes": destination.stat().st_size, "sha256": sha256_file(destination)})
+        stdout_path, stderr_path = work / ".howhow-stdout", work / ".howhow-stderr"
+        env = {key: os.environ[key] for key in ("PATH", "PATHEXT", "SYSTEMROOT", "WINDIR", "COMSPEC") if key in os.environ}
+        env.update(declared_env)
+        env.update({"HOWHOW_SEED": str(spec["seed"]), "PYTHONHASHSEED": str(spec["seed"]), "TEMP": temp, "TMP": temp})
+        started = time.monotonic()
+        timed_out = False
+        launch_error = None
+        returncode = None
+        with stdout_path.open("wb") as stdout_file, stderr_path.open("wb") as stderr_file:
+            try:
+                process = subprocess.Popen(command, cwd=work, env=env, stdout=stdout_file, stderr=stderr_file, shell=False)
+                try:
+                    returncode = process.wait(timeout=float(timeout))
+                except subprocess.TimeoutExpired:
+                    timed_out = True
+                    process.kill()
+                    returncode = process.wait()
+            except OSError as exc:
+                launch_error = f"{type(exc).__name__}: {exc}"
+        elapsed = time.monotonic() - started
+        stdout_size, stderr_size = stdout_path.stat().st_size, stderr_path.stat().st_size
+        with stdout_path.open("rb") as stream:
+            stdout_bytes = stream.read(MAX_EXPERIMENT_OUTPUT_BYTES)
+        with stderr_path.open("rb") as stream:
+            stderr_bytes = stream.read(MAX_EXPERIMENT_OUTPUT_BYTES)
+        output_overflow = stdout_size > MAX_EXPERIMENT_OUTPUT_BYTES or stderr_size > MAX_EXPERIMENT_OUTPUT_BYTES
+        retained_stdout = stdout_bytes.decode("utf-8", errors="replace")
+        retained_stderr = stderr_bytes.decode("utf-8", errors="replace")
+        status = "SUCCESS" if returncode == 0 and not timed_out and not output_overflow and launch_error is None else "FAILED"
+        error = None
+        if launch_error:
+            error = "command launch failed: " + launch_error
+        elif timed_out:
+            error = f"command timed out after {timeout} seconds"
+        elif output_overflow:
+            error = f"command output exceeded {MAX_EXPERIMENT_OUTPUT_BYTES} bytes per stream"
+        elif returncode != 0:
+            error = f"command exited with status {returncode}"
+        record = {
+            "id": experiment_id,
+            "hypothesis": spec["hypothesis"],
+            "command": command,
+            "status": status,
+            "raw_observations": [{
+                "stdout": retained_stdout,
+                "stderr": retained_stderr,
+                "stdout_truncated": stdout_size > MAX_EXPERIMENT_OUTPUT_BYTES,
+                "stderr_truncated": stderr_size > MAX_EXPERIMENT_OUTPUT_BYTES,
+                "exit_status": returncode,
+                "timed_out": timed_out,
+            }],
+            "metrics": {
+                "elapsed_seconds": round(elapsed, 6),
+                "stdout_bytes": stdout_size,
+                "stderr_bytes": stderr_size,
+            },
+            "code_revision": spec["code_revision"],
+            "seed": spec["seed"],
+            "inputs": input_manifest,
+            "environment": declared_env,
+            "runner": {
+                "kind": "bounded-local-isolated-workdir",
+                "timeout_seconds": timeout,
+                "max_output_bytes_per_stream": MAX_EXPERIMENT_OUTPUT_BYTES,
+                "host_access_prevented": False,
+                "network_access_prevented": False,
+            },
+        }
+        if error is not None:
+            record["error"] = error
+        descriptor = work / "record.json"
+        atomic_json(descriptor, record)
+        return record_experiment(root, descriptor)
 
 
 def experiment_record_issues(record: Any, expected_id: str | None = None) -> list[str]:
