@@ -1,5 +1,13 @@
 {
   "packages": [
     "npm:pi-subagents@0.55.0"
-  ]
+  ],
+  "subagents": {
+    "defaultModel": "openai-codex/gpt-5.6-luna",
+    "defaultThinking": "medium",
+    "modelScope": {
+      "enforce": true,
+      "allow": ["openai-codex/gpt-5.6-luna"]
+    }
+  }
 }
