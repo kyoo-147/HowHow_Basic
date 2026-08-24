@@ -27,7 +27,12 @@ class VNextTests(unittest.TestCase):
 
     def test_empty_opinion_pins_and_manifest_capabilities(self):
         self.assertEqual((self.root / 'OPINION.md').stat().st_size, 0)
-        self.assertEqual(len(json.loads((self.root / '.howhow/integration-manifest.json').read_text())['integrations']), 13)
+        manifest = json.loads((self.root / '.howhow/integration-manifest.json').read_text())
+        self.assertEqual(len(manifest['integrations']), 13)
+        academic = next(x for x in manifest['integrations'] if x['name'] == 'Academic-Paper-Skills')
+        self.assertEqual(academic['upstream_pin'], 'd67bf46aa3a0176847a2749ce84e99d556021f20')
+        self.assertEqual(academic['live_status'], 'NOT_CALLED')
+        self.assertIn('paper context', academic['translated_contract'])
         self.assertEqual(len(capability_list(self.root)['capabilities']), 13)
 
     def test_hard_gate_before_three_to_five_ranking(self):

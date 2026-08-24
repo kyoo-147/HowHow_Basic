@@ -62,6 +62,9 @@ def init_vnext(root):
         'DeepScientist': ('research planning concepts', 'restricted planning notes', 'restricted review; no execution'),
     }
     entries = [{'name': n, 'sha': s, 'license_status': modes[n][0], 'use_mode': modes[n][1], 'enabled': modes[n][2], 'howhow_contract': contracts[n][0], 'artifact': contracts[n][1], 'limitations': contracts[n][2], 'fixture_provenance': 'Phase A deterministic fixture; supplied approval pin', 'conformance_test': 'exact repository, SHA, license, mode, and live boundary', 'live_status': 'NOT_CALLED'} for n, s, _ in REPOS]
+    for entry in entries:
+        if entry['name'] == 'Academic-Paper-Skills':
+            entry.update({'adaptation': 'HowHow D1 content-contract translation; no copied code or substantial text', 'inspected_upstream_files': ['paper-writing skill/index', 'paper-policy/checklist materials'], 'upstream_pin': 'd67bf46aa3a0176847a2749ce84e99d556021f20', 'translated_contract': 'paper context in; anchored immutable sections out; never invent evidence'})
     value = {'schema_version': 1, 'lineage': 'wanshuiyin ARIS is current upstream authority; Randall ARIS is an older fork/compatibility snapshot', 'integrations': entries}
     atomic_json(root / '.howhow/integration-manifest.json', value)
     atomic_json(root / 'integrations-manifest.json', value)

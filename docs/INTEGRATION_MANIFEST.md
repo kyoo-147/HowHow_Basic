@@ -18,4 +18,4 @@ All entries are fixture metadata, not live calls or copied code. Each project ma
 | OpenScholar | `0e9b8fb912273d3dae39e593da86e4f6d3bf8de1` | reference literature study |
 | DeepScientist | `b36624417f0c6b8238ec02db37b94d6db2faa5b0` | reference workflow |
 
-Each project copy records license status, concrete use mode, HowHow contract/artifact, fixture provenance, conformance test, and `NOT_CALLED` live status in `.howhow/integration-manifest.json`.
+Each project copy records license status, concrete use mode, HowHow contract/artifact, fixture provenance, conformance test, and `NOT_CALLED` live status in `.howhow/integration-manifest.json`. The Academic-Paper-Skills adaptation is documented in `docs/PAPER_SKILLS.md`; its D1 contract is local, attribution-preserving, and never a live upstream call.

@@ -11,11 +11,11 @@ Phase A is a project-local, standard-library Python thin vertical slice. The CLI
 - Briefs, ideas, rankings, selections, targets, and claim maps are records. Consequential transitions require an explicit user confirmation/selection record.
 - Idea ranking is deterministic and occurs only after safety, ethics, license, data, evaluator, resource, and evidence gates. Three to five eligible candidates are required; rejected candidates and reasons remain recorded. Rank 1 recommends but does not authorize execution and no novelty claim is made.
 - Paper targets are provisional at selection and confirmed later. They contain suggested words/pages/figures/tables, rationale, venue constraints, and user decision; no fixed page range is imposed. An argument skeleton may be non-prose.
-- Claim maps record section/paragraph IDs, claim type (`EXTERNAL`, `EMPIRICAL`, `INTERPRETIVE`, `HYPOTHESIS`, `LIMITATION`, `OPINION`), support/contradiction links, uncertainty, and source/run references. Integrity audit is deterministic; human scientific review remains separate.
+- Claim maps record section/paragraph IDs, claim type (`EXTERNAL`, `EMPIRICAL`, `INTERPRETIVE`, `HYPOTHESIS`, `LIMITATION`, `OPINION`), support/contradiction links, uncertainty, and source/run references. Integrity audit is deterministic; human scientific review remains separate. Phase D1 adds a read-only manuscript context and immutable section drafts; imports cannot create claims or evidence.
 
 ## Flow
 
-`start` -> inspect differentiated capabilities and source plan -> create a literature protocol -> ask consequential inclusion/access/license decisions -> import provisional candidates -> retain and verify evidence -> build a FOUNDATIONAL/NEAREST/SUPPORTING/CONTRADICTING matrix -> run contradiction and coverage audit -> propose/confirm brief -> add 3–5 gated ideas -> rank -> record user selection -> propose target -> confirm target -> add/audit claims -> human review. `continue` presents the next bounded step and never fabricates model-generated ideas.
+`start` -> inspect differentiated capabilities and source plan -> create a literature protocol -> ask consequential inclusion/access/license decisions -> import provisional candidates -> retain and verify evidence -> build a FOUNDATIONAL/NEAREST/SUPPORTING/CONTRADICTING matrix -> run contradiction and coverage audit -> propose/confirm brief -> add 3–5 gated ideas -> rank -> record user selection -> propose target -> confirm target -> add/audit claims -> freeze paper context -> import anchored sections -> detailed substantive audit -> human review. `continue` presents the next bounded step and never fabricates model-generated ideas.
 
 ## Phase B literature provenance
 

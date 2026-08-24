@@ -16,6 +16,7 @@ from .vnext import (brief_confirm, brief_propose, brief_show, capability_inspect
     claim_add, claim_audit, idea_add, idea_rank, idea_select, target_confirm, target_propose, init_vnext)
 from .literature import add_matrix, add_transformed, audit as audit_literature, candidate_adapter_request, create_protocol, decide_candidate, import_candidate
 from .experiment_v2 import proposal_create, proposal_list, objective_save, grant_issue, run_grant, doctor, experiment_audit
+from .paper import create_context, context_list, add_section, section_list, audit as audit_paper
 
 
 def emit(value: object) -> None:
@@ -97,6 +98,12 @@ def parser() -> argparse.ArgumentParser:
     build.add_argument("--strict", action="store_true")
     papersub.add_parser("render")
     papersub.add_parser("finalize")
+    papersub.add_parser("context")
+    ps = papersub.add_parser("section")
+    pss = ps.add_subparsers(dest="section_command", required=True)
+    psa = pss.add_parser("add"); psa.add_argument("file")
+    pss.add_parser("list")
+    papersub.add_parser("audit")
     package = sub.add_parser("package")
     package.add_argument("--strict", action="store_true")
     verify = sub.add_parser("verify")
@@ -148,7 +155,9 @@ def main(argv: list[str] | None = None) -> int:
             if args.plan_command == "save": emit(save_plan(root, Path(args.file)))
             else: emit(json.loads((root / ".howhow/plan.json").read_text(encoding="utf-8")))
         elif args.command == "start":
-            emit({"mode": args.mode, "capabilities": capability_list(root), "sources": json.loads((root / ".howhow/integration-manifest.json").read_text(encoding="utf-8")), "steps": ["inspect capabilities and source plan", "create literature protocol and resolve consequential inclusion/access/license decisions", "expand, deduplicate, and retain exact evidence", "build literature matrix and contradiction/coverage audit", "propose/confirm brief, then ideate and human review", "plan one bounded baseline-first experiment", "show TRUSTED_LOCAL risk and request exactly one human approval before issuing a grant"]})
+            manifest_path = root / ".howhow/integration-manifest.json"
+            sources = json.loads(manifest_path.read_text(encoding="utf-8")) if manifest_path.exists() else {"schema_version": 1, "integrations": [], "legacy_project": True}
+            emit({"mode": args.mode, "capabilities": capability_list(root), "sources": sources, "steps": ["inspect capabilities and source plan", "create literature protocol and resolve consequential inclusion/access/license decisions", "expand, deduplicate, and retain exact evidence", "build literature matrix and contradiction/coverage audit", "propose/confirm brief, then ideate and human review", "plan one bounded baseline-first experiment", "show TRUSTED_LOCAL risk and request exactly one human approval before issuing a grant", "freeze paper context, import anchored sections, and run substantive completeness audit"]})
         elif args.command == "continue":
             continuation = continue_project(root, Path(args.response_file) if args.response_file else None)
             continuation.update({"mode": args.mode, "capabilities": capability_list(root)})
@@ -204,6 +213,14 @@ def main(argv: list[str] | None = None) -> int:
                 if args.strict and not result["passed"]: return 1
             elif args.paper_command == "render":
                 emit(render_record_paper(root))
+            elif args.paper_command == "context":
+                emit(create_context(root))
+            elif args.paper_command == "section":
+                emit(add_section(root, json.loads(Path(args.file).read_text(encoding="utf-8"))) if args.section_command == "add" else section_list(root))
+            elif args.paper_command == "audit":
+                result = audit_paper(root)
+                emit(result)
+                if not result["passed"]: return 1
             else:
                 result = finalize_project(root)
                 emit(result)
