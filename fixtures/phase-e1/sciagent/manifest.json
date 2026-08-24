@@ -1,0 +1,7 @@
+{
+  "repository": "sciagent",
+  "source_file": "setup.py",
+  "source_sha256": "1f3b7f0bb1d0f7f68c5ffb1ed718c724a0d87e20e256c75687c4f5312b15dd30",
+  "upstream_commit": "ece5fdfc9c62601883e21dc6e29939d38052e00f",
+  "fixture_role": "exact upstream file snapshot for E1 contract attestation"
+}

@@ -1,0 +1,7 @@
+{
+  "repository": "wanshuiyin ARIS",
+  "source_file": "README.md",
+  "source_sha256": "3cd6c46c4942e4a8fa95ed2e5b351c494e14479f70876867faf850d7cb1952b2",
+  "upstream_commit": "9cbb6aab1084cd622ccb016cc156008fbdaa1402",
+  "fixture_role": "exact upstream file snapshot for E1 contract attestation"
+}

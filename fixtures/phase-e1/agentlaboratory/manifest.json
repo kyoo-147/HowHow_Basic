@@ -1,0 +1,7 @@
+{
+  "repository": "AgentLaboratory",
+  "source_file": "app.py",
+  "source_sha256": "3015bcf64679caa122eac01ba9afff1ab7736fe83385518017ec95f68b5b65ff",
+  "upstream_commit": "d9017d90e329112d2a80b7712f37ee9094d2cd27",
+  "fixture_role": "exact upstream file snapshot for E1 contract attestation"
+}

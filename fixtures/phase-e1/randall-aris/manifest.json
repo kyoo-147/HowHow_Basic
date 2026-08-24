@@ -1,0 +1,7 @@
+{
+  "repository": "Randall ARIS",
+  "source_file": "README.md",
+  "source_sha256": "983f76965553335866ea22105eceb79cce4d1557991d9c1cea944ca2eb52d973",
+  "upstream_commit": "10394e53e8651efcbedccd377c878e3ba929c3d4",
+  "fixture_role": "exact upstream file snapshot for E1 contract attestation"
+}

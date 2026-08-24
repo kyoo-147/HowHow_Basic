@@ -1,0 +1,7 @@
+{
+  "repository": "gpt-researcher",
+  "source_file": "cli.py",
+  "source_sha256": "b0cdeb184d592aadc32cb54e20d09b47aca23e0f34f2092cb8ead4f8940f52de",
+  "upstream_commit": "5d84d2f5553e70a2765a8ff3a0d2672d60437ce8",
+  "fixture_role": "exact upstream file snapshot for E1 contract attestation"
+}

@@ -18,6 +18,7 @@ from .literature import add_matrix, add_transformed, audit as audit_literature, 
 from .experiment_v2 import proposal_create, proposal_list, objective_save, grant_issue, run_grant, doctor, experiment_audit
 from .paper import create_context, context_list, add_section, section_list, audit as audit_paper
 from .d2 import add_artifact, artifact_audit, add_citation, citation_audit, add_issue, issue_audit, add_policy, policy_audit, d2_status
+from .adapters import doctor as integration_doctor, export_contract, import_contract, contracts as adapter_contracts
 
 
 def emit(value: object) -> None:
@@ -111,9 +112,17 @@ def parser() -> argparse.ArgumentParser:
     verify = sub.add_parser("verify")
     verify.add_argument("--strict", action="store_true")
     verify.add_argument("--profile", choices=["fixture", "project", "vnext-detailed"], default="project")
+    integ = sub.add_parser("integration", help="inspect and exchange bounded E1 adapter contracts")
+    isub = integ.add_subparsers(dest="integration_command", required=True)
+    isub.add_parser("doctor", help="read-only checkout conformance doctor")
+    ie = isub.add_parser("export"); ie.add_argument("repository"); ie.add_argument("operation"); ie.add_argument("file")
+    ii = isub.add_parser("import"); ii.add_argument("file")
+    isub.add_parser("contracts")
     cap = sub.add_parser("capability")
     capsub = cap.add_subparsers(dest="capability_command", required=True)
     capsub.add_parser("list")
+    capsub.add_parser("cards", help="show plain-language capability availability cards")
+    capsub.add_parser("doctor", help="show read-only checkout and license availability")
     ci = capsub.add_parser("inspect"); ci.add_argument("id")
     brief = sub.add_parser("brief")
     bsub = brief.add_subparsers(dest="brief_command", required=True)
@@ -164,13 +173,21 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "start":
             manifest_path = root / ".howhow/integration-manifest.json"
             sources = json.loads(manifest_path.read_text(encoding="utf-8")) if manifest_path.exists() else {"schema_version": 1, "integrations": [], "legacy_project": True}
-            emit({"mode": args.mode, "capabilities": capability_list(root), "sources": sources, "steps": ["inspect capabilities and source plan", "create literature protocol and resolve consequential inclusion/access/license decisions", "expand, deduplicate, and retain exact evidence", "build literature matrix and contradiction/coverage audit", "propose/confirm brief, then ideate and human review", "plan one bounded baseline-first experiment", "show TRUSTED_LOCAL risk and request exactly one human approval before issuing a grant", "freeze paper context, import anchored sections, and run substantive completeness audit"]})
+            mode_guidance = {'Manual': 'You approve each consequential step; no automatic execution is implied.', 'Hybrid': 'HowHow prepares bounded proposals, but you approve consequential steps and grants.', 'Auto': 'HowHow may prepare routine bounded records, but it never bypasses safety, license, human approval, or publication gates.'}
+            emit({"mode": args.mode, "mode_guidance": mode_guidance[args.mode], "capabilities": capability_list(root), "sources": sources, "steps": ["inspect capabilities and source plan", "create literature protocol and resolve consequential inclusion/access/license decisions", "expand, deduplicate, and retain exact evidence", "build literature matrix and contradiction/coverage audit", "propose/confirm brief, then ideate and human review", "plan one bounded baseline-first experiment", "show TRUSTED_LOCAL risk and request exactly one human approval before issuing a grant", "freeze paper context, import anchored sections, and run substantive completeness audit"]})
         elif args.command == "continue":
             continuation = continue_project(root, Path(args.response_file) if args.response_file else None)
             continuation.update({"mode": args.mode, "capabilities": capability_list(root)})
             emit(continuation)
+        elif args.command == "integration":
+            if args.integration_command == "doctor": emit(integration_doctor(root))
+            elif args.integration_command == "contracts": emit({'contracts': adapter_contracts()})
+            elif args.integration_command == "export": emit(export_contract(args.repository, args.operation, json.loads(Path(args.file).read_text(encoding='utf-8'))))
+            else: emit(import_contract(root, json.loads(Path(args.file).read_text(encoding='utf-8'))))
         elif args.command == "capability":
-            emit(capability_list(root) if args.capability_command == "list" else capability_inspect(root,args.id))
+            if args.capability_command == 'doctor': emit(integration_doctor(root))
+            elif args.capability_command == 'cards': emit({'cards': capability_list(root)['capabilities'], 'guidance': 'Cards describe bounded availability, not live execution or scientific validity.'})
+            else: emit(capability_list(root) if args.capability_command == "list" else capability_inspect(root,args.id))
         elif args.command == "brief":
             emit(brief_propose(root,args.title,args.mode) if args.brief_command == "propose" else brief_show(root) if args.brief_command == "show" else brief_confirm(root,args.id))
         elif args.command == "idea":

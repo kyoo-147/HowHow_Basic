@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HowHow E1 adapter envelope",
+  "type": "object",
+  "required": ["schema_version", "kind", "repository", "pin", "operation", "payload", "payload_sha256", "state", "raw_adapter_receipt", "envelope_sha256"],
+  "properties": {
+    "schema_version": {"const": 1}, "kind": {"const": "howhow-adapter-envelope"},
+    "repository": {"type": "string"}, "pin": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "operation": {"type": "string"}, "payload": {"type": "object"},
+    "payload_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "state": {"const": "PROVISIONAL"}, "raw_adapter_receipt": {},
+    "envelope_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }, "additionalProperties": true
+}

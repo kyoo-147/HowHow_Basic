@@ -1,0 +1,7 @@
+{
+  "repository": "AI-Researcher",
+  "source_file": "pyproject.toml",
+  "source_sha256": "1c557fcb2d563b509abf60fdb4132d72373474dbf6d059d752b2b780788d43ed",
+  "upstream_commit": "f9a6f8480860c193afff600eeffe3defcee8a978",
+  "fixture_role": "exact upstream file snapshot for E1 contract attestation"
+}

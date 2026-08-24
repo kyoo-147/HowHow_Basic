@@ -1,0 +1,7 @@
+{
+  "repository": "deer-flow",
+  "source_file": "AGENTS.md",
+  "source_sha256": "48ec887f9d2d67e74f917cd8b3dce73b95f2eb8cdaa96cc4b7874c02a1b0c2b4",
+  "upstream_commit": "917fe595fcfc2d5a30e7e55deed1bdb950785fc2",
+  "fixture_role": "exact upstream file snapshot for E1 contract attestation"
+}

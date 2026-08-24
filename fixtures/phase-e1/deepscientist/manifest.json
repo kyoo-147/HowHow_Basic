@@ -1,0 +1,7 @@
+{
+  "repository": "DeepScientist",
+  "source_file": "AGENTS.md",
+  "source_sha256": "3247b279c2877d3df2a62890f7637675ca781b22b37df55b0da5914ee485c1d0",
+  "upstream_commit": "b36624417f0c6b8238ec02db37b94d6db2faa5b0",
+  "fixture_role": "exact upstream file snapshot for E1 contract attestation"
+}

@@ -1,0 +1,7 @@
+{
+  "repository": "autoresearch",
+  "source_file": "train.py",
+  "source_sha256": "2954175f4ac42ad65164aef40910ef953789abcd05a5cc886ac9ba5a00814414",
+  "upstream_commit": "228791fb499afffb54b46200aca536f79142f117",
+  "fixture_role": "exact upstream file snapshot for E1 contract attestation"
+}

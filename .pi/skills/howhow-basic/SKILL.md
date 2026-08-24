@@ -18,6 +18,10 @@ Use the project-local `howhow` CLI as the durable control plane. The main Pi age
 7. Build and package LaTeX locally. `READY_FOR_HUMAN_REVIEW` means inspectable package readiness only; it is not novelty, correctness, acceptance, or arXiv submission.
 8. Ask the user at direction, permissions, material spend, scientific interpretation, and publication boundaries.
 
+## Phase E1 integration loop
+
+Use `howhow integration contracts` to inspect all 13 exact-pin, surface-hash contracts and `howhow integration doctor` to inspect optional checkouts read-only. Missing checkouts are `AVAILABLE_CONTRACT_NOT_INSTALLED`, not failures or live use. Export/import envelopes retain raw receipts and remain `PROVISIONAL` until schema, hash, exact-pin, and cross-link validation. Never execute AI-Scientist, DeerFlow, or reference-only integrations on the host; preserve AI disclosure/license and offline/Windows restrictions.
+
 ## Phase A conversational loop
 
 `howhow start` lists truthful capabilities and pinned sources, defaults to `Hybrid`, and offers `Manual`, `Hybrid`, and `Auto`. It briefs the user step by step without inventing model ideas. Confirm a brief, add 3–5 valid gated candidates, rank and record selection, propose then confirm a provisional paper target, and audit a claim map before separate human scientific review. `OPINION.md` is preference only and may be `MISSING`, `EMPTY`, or `PRESENT`; it is never evidence, approval, novelty, or publication permission. Never call reference-only capabilities live.

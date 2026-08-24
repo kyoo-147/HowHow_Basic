@@ -67,13 +67,28 @@ def init_vnext(root):
             entry.update({'adaptation': 'HowHow D1/D2 content, figure/table, and review-contract translation; no copied code or substantial text', 'inspected_upstream_files': ['paper-writing skill/index', 'paper-policy/checklist materials', 'paper-figures-tables methods'], 'upstream_pin': 'd67bf46aa3a0176847a2749ce84e99d556021f20', 'translated_contract': 'paper context in; anchored sections and provenance manifests out; never invent evidence or metrics'})
         if entry['name'] == 'latex-arxiv-SKILL':
             entry.update({'adaptation': 'HowHow D2 clean-room compile, citation-preserving refinement, typed issue execution, and package-QA translation; no copied code', 'inspected_upstream_files': ['latex build workflow', 'citation and source-package checks'], 'upstream_pin': '349ce88a0797422911a4ce58ed335842e9b87e15', 'translated_contract': 'approved plan before prose; deterministic compile and extracted archive QA; no venue submission; MIT/IEEEtran boundaries preserved'})
-    value = {'schema_version': 1, 'lineage': 'wanshuiyin ARIS is current upstream authority; Randall ARIS is an older fork/compatibility snapshot', 'integrations': entries}
+    # E1 contract details are generated from the same pinned repository list and
+    # retained in the project manifest; generation never inspects or mutates a checkout.
+    from .adapters import contract
+    for entry in entries:
+        entry['e1_contract'] = contract(entry['name'])
+    value = {'schema_version': 2, 'lineage': 'wanshuiyin ARIS is current upstream authority; Randall ARIS is an older fork/compatibility snapshot', 'integrations': entries}
     atomic_json(root / '.howhow/integration-manifest.json', value)
 
 def capabilities(root):
     manifest = root / '.howhow/integration-manifest.json'
     entries = json.loads(manifest.read_text(encoding='utf-8'))['integrations'] if manifest.exists() else []
-    return [{'id': 'integration-' + safe_id(item['name'].lower().replace(' ', '-').replace('_', '-')), 'name': item['name'], 'status': item.get('use_mode', 'REFERENCE_ONLY'), 'enabled': item.get('enabled', False), 'live': item.get('live_status') == 'CALLED', 'sources': [item['name']], 'license_status': item['license_status'], 'sha': item['sha'], 'live_status': item.get('live_status', 'NOT_CALLED'), 'limitations': item.get('limitations', 'No live adapter or execution is claimed')} for item in entries]
+    from .adapters import _checkout_candidates
+    cards = []
+    for item in entries:
+        e1 = item.get('e1_contract', {})
+        installed = bool(_checkout_candidates(root, item['name']))
+        available = installed and item.get('enabled', False) and item.get('use_mode') == 'ADAPTED'
+        guidance = ('Installed and enabled: bounded adapter contract is available; it is still provisional.' if available else
+                    'Contract is inspectable only; install the exact pinned checkout before treating it as available.' if not installed else
+                    'Checkout is present but not enabled for live use; review its license and conformance first.')
+        cards.append({'id': 'integration-' + safe_id(item['name'].lower().replace(' ', '-').replace('_', '-')), 'name': item['name'], 'status': item.get('use_mode', 'REFERENCE_ONLY'), 'installed': installed, 'available': available, 'enabled': item.get('enabled', False), 'live': item.get('live_status') == 'CALLED', 'sources': [item['name']], 'license_status': item['license_status'], 'sha': item['sha'], 'live_status': item.get('live_status', 'NOT_CALLED'), 'operations': e1.get('operations', []), 'restrictions': e1.get('restrictions', []), 'recommended_use': item.get('artifact', 'inspect the bounded contract'), 'guidance': guidance, 'limitations': item.get('limitations', 'No live adapter or execution is claimed')})
+    return cards
 
 def capability_list(root): return {'capabilities': capabilities(root), 'opinion': opinion_state(root)}
 def capability_inspect(root, identifier):

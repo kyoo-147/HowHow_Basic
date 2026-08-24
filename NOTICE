@@ -2,4 +2,6 @@ HowHow Basic notices
 
 HowHow Basic contains clean-room adaptations of documented workflows from the repositories named in docs/INTEGRATION_MANIFEST.md. No upstream code or substantial upstream text is redistributed. Upstream license terms and notices remain with their respective repositories; this project does not claim to relicense them.
 
+Phase E1 adapter envelopes are local schema contracts and deterministic conformance fixtures. They retain exact repository pins, surface paths, hashes, and raw adapter receipts; they do not vendor, execute, fetch, or publish upstream projects. Reference-only and restricted licenses remain explicit. AI-Scientist restricted use requires acknowledgement and manuscript AI disclosure. Contriever's CC-BY-NC boundary is preserved for the offline OpenScholar contract.
+
 The local HowHow implementation is distributed under the project license. The adapted latex workflow preserves the IEEEtran LPPL boundary and does not vendor IEEEtran or submit to a venue.

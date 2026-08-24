@@ -1,10 +1,10 @@
 # HowHow Basic status
 
-Updated 2026-08-23 after adding the Phase D2 immutable artifact/citation/issue/policy workflow slice.
+Updated 2026-08-23 after adding the Phase E1 pinned ecosystem adapter contracts and read-only conformance doctor.
 
 ## Evidence-backed status
 
-Status is described by evidence and boundaries rather than completion percentages. Phase 0 is the deterministic ClaimLedger fixture and existing local control plane. vNext Phase A is the thin vertical slice: empty opinion state, 13 differentiated manifest-backed capability entries and pinned integrations, confirmation-gated immutable brief/target revisions, hard-gated 3–5 idea ranking and selection, provisional argument-skeleton targets, and claim-map integrity audit including retained source/run hashes. Phase B adds deterministic, immutable literature protocol/candidate/decision/matrix/transformed-source records, a bounded gpt-researcher adapter contract, exact evidence requirements, contradiction search and explicit unresolved coverage audit. No real research episode has occurred. Phase D1 adds immutable paper-context snapshots, anchored section imports, and a substantive content-contract audit. Phase D2 adds fail-closed figure/table provenance manifests, citation identity-vs-support records, immutable issue/revision/dissent records, and policy/license/disclosure inventory. `verify --profile vnext-detailed` requires D1 substantive content plus all D2 classes; `fixture` remains legacy compatibility and is never advertised as a detailed research episode. The fixture is deterministic and explicitly non-scientific; it demonstrates product gates only. A real research episode and human scientific review are separate activities; publication is not performed or authorized by this product.
+Status is described by evidence and boundaries rather than completion percentages. Phase E1 is implemented as local, deterministic contracts and tests; no upstream checkout is claimed live. Phase 0 is the deterministic ClaimLedger fixture and existing local control plane. vNext Phase A is the thin vertical slice: empty opinion state, 13 differentiated manifest-backed capability entries and pinned integrations, confirmation-gated immutable brief/target revisions, hard-gated 3–5 idea ranking and selection, provisional argument-skeleton targets, and claim-map integrity audit including retained source/run hashes. Phase B adds deterministic, immutable literature protocol/candidate/decision/matrix/transformed-source records, a bounded gpt-researcher adapter contract, exact evidence requirements, contradiction search and explicit unresolved coverage audit. No real research episode has occurred. Phase D1 adds immutable paper-context snapshots, anchored section imports, and a substantive content-contract audit. Phase D2 adds fail-closed figure/table provenance manifests, citation identity-vs-support records, immutable issue/revision/dissent records, and policy/license/disclosure inventory. `verify --profile vnext-detailed` requires D1 substantive content plus all D2 classes; `fixture` remains legacy compatibility and is never advertised as a detailed research episode. The fixture is deterministic and explicitly non-scientific; it demonstrates product gates only. A real research episode and human scientific review are separate activities; publication is not performed or authorized by this product.
 
 | Capability | Status | Evidence |
 |---|---|---|
@@ -52,6 +52,10 @@ python -m howhow paper finalize                                # exit 0, COMPLET
 ```
 
 The final exact product verdict is `READY_FOR_HUMAN_REVIEW`. It means the deterministic gates and local package are inspectable. It does **not** mean accepted, correct, novel, peer reviewed, scientifically generalizable, or eligible for arXiv. No external submission was made. When all plan tasks are exhausted, `paper finalize` records `COMPLETE` only after record rendering, strict verification, LaTeX build, and source-archive extraction/hash validation; `COMPLETE` still retains the human-review boundary.
+
+## Phase E1 evidence
+
+`howhow integration contracts` emits all 13 pin-bound contracts and surface hashes. `howhow integration doctor` is read-only and reports missing checkouts as `AVAILABLE_CONTRACT_NOT_INSTALLED`. Export/import tests cover every repository, wrong pins, envelope/payload tampering, restricted AI-Scientist acknowledgement/disclosure, raw receipt retention, and provisional-only state. The optional checkout doctor does not clone, execute, or mutate caches. Contract fixtures do not represent live upstream execution or scientific validation.
 
 ## Residual gaps
 

@@ -1,0 +1,7 @@
+{
+  "repository": "AI-Scientist",
+  "source_file": "README.md",
+  "source_sha256": "8300593c7febe85681e6e054c88423934efc838fc3054d857f3b0665f52b4c7b",
+  "upstream_commit": "1de1dbc1f4ee2c5f61e9c94348d55eb51d7fa2eb",
+  "fixture_role": "exact upstream file snapshot for E1 contract attestation"
+}

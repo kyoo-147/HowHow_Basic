@@ -1,0 +1,7 @@
+{
+  "repository": "Academic-Paper-Skills",
+  "source_file": "README.md",
+  "source_sha256": "04e671254a1aab8ef1106d8c4127304001ceb6c8793c38f07d177630f411e77a",
+  "upstream_commit": "d67bf46aa3a0176847a2749ce84e99d556021f20",
+  "fixture_role": "exact upstream file snapshot for E1 contract attestation"
+}

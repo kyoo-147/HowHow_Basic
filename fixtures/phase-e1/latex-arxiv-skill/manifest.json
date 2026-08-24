@@ -1,0 +1,7 @@
+{
+  "repository": "latex-arxiv-SKILL",
+  "source_file": "AGENTS.md",
+  "source_sha256": "df3ae746bcaa6da1ca089ffac9ab53f10d39a3f2998676ecf30d288d94adfc42",
+  "upstream_commit": "349ce88a0797422911a4ce58ed335842e9b87e15",
+  "fixture_role": "exact upstream file snapshot for E1 contract attestation"
+}

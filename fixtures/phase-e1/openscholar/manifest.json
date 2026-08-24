@@ -1,0 +1,7 @@
+{
+  "repository": "OpenScholar",
+  "source_file": "run.py",
+  "source_sha256": "72c9f627f5fa225328d789f5da74a6292a5901ddbdd00a2962f843fdaa6f20b9",
+  "upstream_commit": "0e9b8fb912273d3dae39e593da86e4f6d3bf8de1",
+  "fixture_role": "exact upstream file snapshot for E1 contract attestation"
+}
