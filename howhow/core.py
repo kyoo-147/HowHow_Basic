@@ -679,6 +679,31 @@ def record_experiment(root: Path, descriptor: Path) -> dict[str, Any]:
     return record
 
 
+def next_workflow_step(root: Path) -> dict[str, str]:
+    """Return the single truthful user action without exposing internal schemas."""
+    literature = root / '.howhow/literature'
+    protocol_count = len(list((literature / 'protocols').glob('*.json'))) if literature.exists() else 0
+    candidate_count = len(list((literature / 'candidates').glob('*.json'))) if literature.exists() else 0
+    matrix_count = len(list((literature / 'matrix').glob('*.json'))) if literature.exists() else 0
+    if protocol_count == 0:
+        return {'workflow_step': 'SOURCE_AND_PROTOCOL', 'instruction': 'Review permitted sources, then create a literature protocol with bounded queries, receipts, contradiction search, and a stopping test.'}
+    if candidate_count == 0:
+        return {'workflow_step': 'CANDIDATE_REVIEW', 'instruction': 'Import bounded adapter candidates linked to this protocol, then record inclusion, access, and license decisions.'}
+    if matrix_count == 0:
+        return {'workflow_step': 'EVIDENCE_AND_MATRIX', 'instruction': 'Retain and verify exact evidence, build the source/evidence matrix, and run the literature audit.'}
+    targets = list((root / '.howhow/targets').glob('*.json'))
+    confirmed_target = any(read_json(p).get('status') == 'CONFIRMED' for p in targets)
+    contexts = list((root / '.howhow/paper/contexts').glob('*.json'))
+    sections = list((root / '.howhow/paper/sections').glob('*.json'))
+    if confirmed_target and not contexts:
+        return {'workflow_step': 'MANUSCRIPT_CONTEXT', 'instruction': 'Freeze the read-only paper context from confirmed records before drafting.'}
+    if contexts and not sections:
+        return {'workflow_step': 'MANUSCRIPT_SECTIONS', 'instruction': 'Import substantive sections with paragraph-level claim anchors; drafting cannot create claims or evidence.'}
+    if confirmed_target and not list((root / '.howhow/proposals').glob('*.json')):
+        return {'workflow_step': 'EXPERIMENT_PLAN', 'instruction': 'Propose a bounded experiment plan, explain TRUSTED_LOCAL risk, and request one consequential human approval.'}
+    return {'workflow_step': 'MANUSCRIPT_CONTEXT_AND_SECTIONS', 'instruction': 'Freeze immutable paper context, import anchored substantive sections, then run the detailed completeness audit; compilation and page count are not gates.'}
+
+
 def continue_project(root: Path, response_file: Path | None = None) -> dict[str, Any]:
     state = read_json(state_path(root), {})
     if state.get("paused"):
@@ -690,28 +715,8 @@ def continue_project(root: Path, response_file: Path | None = None) -> dict[str,
     if pending is None:
         if (root / '.howhow/plan.json').exists() and tasks:
             return finalize_project(root)
-        literature = root / '.howhow/literature'
-        protocol_count = len(list((literature / 'protocols').glob('*.json'))) if literature.exists() else 0
-        candidate_count = len(list((literature / 'candidates').glob('*.json'))) if literature.exists() else 0
-        matrix_count = len(list((literature / 'matrix').glob('*.json'))) if literature.exists() else 0
-        if protocol_count == 0:
-            return {'state': 'READY', 'workflow_step': 'SOURCE_AND_PROTOCOL', 'instruction': 'Review permitted sources, then create a literature protocol with executed bounded queries, receipts, contradiction search, and a substantiated stopping test.'}
-        if candidate_count == 0:
-            return {'state': 'READY', 'workflow_step': 'CANDIDATE_REVIEW', 'instruction': 'Import only bounded adapter candidates linked to this protocol, then record inclusion/access/license decisions.'}
-        if matrix_count == 0:
-            return {'state': 'READY', 'workflow_step': 'EVIDENCE_AND_MATRIX', 'instruction': 'Retain exact evidence, verify it, build the source/evidence matrix, and run the literature audit.'}
-        targets = list((root / '.howhow/targets').glob('*.json'))
-        contexts = list((root / '.howhow/paper/contexts').glob('*.json'))
-        sections = list((root / '.howhow/paper/sections').glob('*.json'))
-        if targets and any(read_json(p).get('status') == 'CONFIRMED' for p in targets) and not contexts:
-            return {'state': 'READY', 'workflow_step': 'MANUSCRIPT_CONTEXT', 'instruction': 'Freeze the read-only paper context from confirmed records before drafting.'}
-        if contexts and not sections:
-            return {'state': 'READY', 'workflow_step': 'MANUSCRIPT_SECTIONS', 'instruction': 'Import substantive sections with paragraph-level claim anchors; draft import cannot create claims or evidence.'}
-        if targets and any(read_json(p).get('status') == 'CONFIRMED' for p in targets):
-            proposals = list((root / '.howhow/proposals').glob('*.json'))
-            if not proposals:
-                return {'state': 'READY', 'workflow_step': 'EXPERIMENT_PLAN', 'instruction': 'Propose a bounded experiment plan, explain TRUSTED_LOCAL risk, and request one consequential human approval.'}
-        return {'state': 'READY', 'workflow_step': 'MANUSCRIPT_CONTEXT_AND_SECTIONS', 'instruction': 'Freeze the immutable paper context, import substantive sections with paragraph claim anchors, then run the detailed completeness audit; compilation and page count are not gates.'}
+        step = next_workflow_step(root)
+        return {'state': 'READY', **step}
     if pending.get("kind") == "human" and response_file is None:
         request = {"request_id": "request-" + uuid.uuid4().hex[:16], "task_id": pending["id"], "question": pending.get("instruction", "Human input required"), "created_at": now()}
         request_path = root / ".howhow/runs" / pending["id"] / "request.json"
@@ -782,10 +787,12 @@ def status(root: Path) -> dict[str, Any]:
     proposals = [read_json(p) for p in (root / ".howhow/proposals").glob("*.json")]
     grants = [read_json(p) for p in (root / ".howhow/grants").glob("*.json")]
     workflow = "EXPERIMENT_APPROVAL" if proposals and not grants else ("EXPERIMENT_EXECUTION" if grants else "RESEARCH_CONTINUATION")
+    step = next_workflow_step(root)
     contexts = list((root / ".howhow/paper/contexts").glob("*.json"))
     sections = list((root / ".howhow/paper/sections").glob("*.json"))
-    next_action = "freeze paper context" if not contexts else ("import substantive sections with claim anchors" if not sections else "run detailed paper completeness audit")
-    return {"project": root.name, "root": str(root), "state": state, "workflow_step": workflow, "next_manuscript_action": next_action, "missing_manuscript_gates": ["paper_context"] if not contexts else (["substantive_sections"] if not sections else ["completeness_audit"]), "approval_state": "ISSUED" if grants else ("PROPOSED" if proposals else "NOT_REQUESTED"), "trust_profile": (proposals[-1].get("trust_profile") if proposals else None), "risk_warning": "NOT SANDBOXED: host filesystem and network access remain possible" if any(p.get("trust_profile") == "TRUSTED_LOCAL" for p in proposals) else None, "proposal_count": len(proposals), "sources": len(source_list(root)), "evidence": len(list((root / ".howhow/evidence").glob("*.json"))), "experiments": len(list((root / ".howhow/experiments").glob("*.json"))), "failures": len(list((root / ".howhow/failures.jsonl").read_text(encoding="utf-8").splitlines())) if (root / ".howhow/failures.jsonl").exists() else 0, "opinion": capability_list(root)["opinion"], "capabilities": capability_list(root)["capabilities"]}
+    missing = ["paper_context"] if not contexts else (["substantive_sections"] if not sections else ["completeness_audit"])
+    manuscript_action = "freeze paper context" if not contexts else ("import substantive sections with claim anchors" if not sections else "run detailed paper completeness audit")
+    return {"project": root.name, "root": str(root), "state": state, "workflow_step": workflow, "next_action": step["instruction"], "next_manuscript_action": manuscript_action, "missing_manuscript_gates": missing, "approval_state": "ISSUED" if grants else ("PROPOSED" if proposals else "NOT_REQUESTED"), "trust_profile": (proposals[-1].get("trust_profile") if proposals else None), "risk_warning": "NOT SANDBOXED: host filesystem and network access remain possible" if any(p.get("trust_profile") == "TRUSTED_LOCAL" for p in proposals) else None, "proposal_count": len(proposals), "sources": len(source_list(root)), "evidence": len(list((root / ".howhow/evidence").glob("*.json"))), "experiments": len(list((root / ".howhow/experiments").glob("*.json"))), "failures": len(list((root / ".howhow/failures.jsonl").read_text(encoding="utf-8").splitlines())) if (root / ".howhow/failures.jsonl").exists() else 0, "opinion": capability_list(root)["opinion"]}
 
 
 def _tool(name: str) -> str | None:

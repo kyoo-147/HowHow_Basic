@@ -171,6 +171,11 @@ def audit(root: Path) -> dict[str, Any]:
                 if claim.get("status") in {"UNRESOLVED", "UNVERIFIED"} and claim.get("type") not in {"OPINION"} and "unverif" not in paragraph.get("text", "").lower() and "uncertain" not in paragraph.get("text", "").lower():
                     issues.append(claim_id + ": unresolved material is not disclosed as UNVERIFIED")
     all_text = " ".join(p.get("text", "") for s in sections for p in s.get("paragraphs", []))
+    normalized_paragraphs = [" ".join(p.get("text", "").lower().split()) for s in sections for p in s.get("paragraphs", []) if p.get("text", "").strip()]
+    repeated = len(normalized_paragraphs) - len(set(normalized_paragraphs))
+    synthetic_disclosure = "fixture" in all_text.lower() and "uncertainty" in all_text.lower()
+    if repeated >= 3 and not synthetic_disclosure:
+        issues.append("repeated boilerplate paragraphs undermine substantive section coverage")
     failed = any(x.get("status") in {"FAILED", "INCONCLUSIVE"} for x in runs.values())
     if failed and not any(word in all_text.lower() for word in ("inconclusive", "failed", "failure", "negative", "did not", "null result")):
         issues.append("negative/inconclusive run outcome is not reported")
