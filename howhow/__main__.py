@@ -9,7 +9,7 @@ from . import __version__
 from .core import (
     add_evidence, audit_evidence, build_paper, continue_project, init_project,
     package_paper, project_root, record_experiment, run_experiment, save_plan, set_paused,
-    source_add, source_inspect, source_list, source_pin, source_search, source_use, status, verify_project, render_record_paper, finalize_project,
+    source_add, source_inspect, source_list, source_pin, source_search, source_use, status, verify_project, render_record_paper, finalize_project, read_json,
 )
 from .reviews import add as add_review, audit as audit_reviews, status as review_status
 from .vnext import (brief_confirm, brief_propose, brief_show, capability_inspect, capability_list,
@@ -17,6 +17,7 @@ from .vnext import (brief_confirm, brief_propose, brief_show, capability_inspect
 from .literature import add_matrix, add_transformed, audit as audit_literature, candidate_adapter_request, create_protocol, decide_candidate, import_candidate
 from .experiment_v2 import proposal_create, proposal_list, objective_save, grant_issue, run_grant, doctor, experiment_audit
 from .paper import create_context, context_list, add_section, section_list, audit as audit_paper
+from .d2 import add_artifact, artifact_audit, add_citation, citation_audit, add_issue, issue_audit, add_policy, policy_audit, d2_status
 
 
 def emit(value: object) -> None:
@@ -104,11 +105,12 @@ def parser() -> argparse.ArgumentParser:
     psa = pss.add_parser("add"); psa.add_argument("file")
     pss.add_parser("list")
     papersub.add_parser("audit")
+    papersub.add_parser("status")
     package = sub.add_parser("package")
     package.add_argument("--strict", action="store_true")
     verify = sub.add_parser("verify")
     verify.add_argument("--strict", action="store_true")
-    verify.add_argument("--profile", choices=["fixture", "project"], default="project")
+    verify.add_argument("--profile", choices=["fixture", "project", "vnext-detailed"], default="project")
     cap = sub.add_parser("capability")
     capsub = cap.add_subparsers(dest="capability_command", required=True)
     capsub.add_parser("list")
@@ -132,6 +134,11 @@ def parser() -> argparse.ArgumentParser:
     lt=lsub.add_parser("transform"); lt.add_argument("file"); lt.add_argument("extracted")
     lsub.add_parser("audit")
     la=lsub.add_parser("adapter-request"); la.add_argument("provider"); la.add_argument("query"); la.add_argument("--limit", type=int, default=10)
+    for name in ("artifact", "citation", "issue", "policy"):
+        group = sub.add_parser(name); gsub = group.add_subparsers(dest=name + "_command", required=True)
+        add_cmd = gsub.add_parser("add"); add_cmd.add_argument("file")
+        gsub.add_parser("audit")
+        gsub.add_parser("inspect")
     return p
 
 
@@ -217,6 +224,8 @@ def main(argv: list[str] | None = None) -> int:
                 emit(create_context(root))
             elif args.paper_command == "section":
                 emit(add_section(root, json.loads(Path(args.file).read_text(encoding="utf-8"))) if args.section_command == "add" else section_list(root))
+            elif args.paper_command == "status":
+                emit(d2_status(root))
             elif args.paper_command == "audit":
                 result = audit_paper(root)
                 emit(result)
@@ -225,6 +234,17 @@ def main(argv: list[str] | None = None) -> int:
                 result = finalize_project(root)
                 emit(result)
                 if result["state"] not in {"COMPLETE", "READY_FOR_HUMAN_REVIEW"}: return 1
+        elif args.command in {"artifact", "citation", "issue", "policy"}:
+            handlers = {
+                "artifact": (add_artifact, artifact_audit),
+                "citation": (add_citation, citation_audit),
+                "issue": (add_issue, issue_audit),
+                "policy": (add_policy, policy_audit),
+            }
+            add_handler, audit_handler = handlers[args.command]
+            if getattr(args, args.command + "_command") == "add": emit(add_handler(root, json.loads(Path(args.file).read_text(encoding="utf-8"))))
+            elif getattr(args, args.command + "_command") == "audit": emit(audit_handler(root))
+            else: emit({"records": [read_json(p) for p in sorted((root / ".howhow" / ("artifacts" if args.command == "artifact" else "citations" if args.command == "citation" else "issues" if args.command == "issue" else "policies")).glob("*.json"))]})
         elif args.command == "package":
             result = package_paper(root, args.strict)
             emit(result)

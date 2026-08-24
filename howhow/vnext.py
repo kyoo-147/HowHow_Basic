@@ -56,18 +56,19 @@ def init_vnext(root):
         'deer-flow': ('orchestration concepts', 'disabled execution export contract with exact pin', 'disabled; no calls; no implicit dependencies'),
         'sciagent': ('literature workflow concepts', 'reference workflow notes', 'reference-only; no calls'),
         'autoresearch': ('baseline-first clean-room protocol: one declared change, fixed objective, ledger, bounded stop', 'tested protocol contract', 'protocol only; no git reset, no infinite loop, no live adapter'),
-        'Academic-Paper-Skills': ('paper structure and evidence checklist', 'adapted checklist artifact', 'adapted skill; no copied code'),
-        'latex-arxiv-SKILL': ('local build and package constraints', 'adapted build checklist', 'adapted skill; no submission'),
+        'Academic-Paper-Skills': ('paper structure, figures/tables provenance, and evidence checklist', 'D2 artifact manifest and conformance checks', 'adapted skill; immutable context only; no invented metrics'),
+        'latex-arxiv-SKILL': ('approved plan, typed issue execution contract, deterministic compile and source-package QA', 'D2 compile/provenance/citation-preserving workflow', 'adapted skill; MIT notice and IEEEtran LPPL boundaries preserved; no submission'),
         'OpenScholar': ('literature synthesis concepts', 'reference synthesis notes', 'reference-only; no calls'),
         'DeepScientist': ('research planning concepts', 'restricted planning notes', 'restricted review; no execution'),
     }
     entries = [{'name': n, 'sha': s, 'license_status': modes[n][0], 'use_mode': modes[n][1], 'enabled': modes[n][2], 'howhow_contract': contracts[n][0], 'artifact': contracts[n][1], 'limitations': contracts[n][2], 'fixture_provenance': 'Phase A deterministic fixture; supplied approval pin', 'conformance_test': 'exact repository, SHA, license, mode, and live boundary', 'live_status': 'NOT_CALLED'} for n, s, _ in REPOS]
     for entry in entries:
         if entry['name'] == 'Academic-Paper-Skills':
-            entry.update({'adaptation': 'HowHow D1 content-contract translation; no copied code or substantial text', 'inspected_upstream_files': ['paper-writing skill/index', 'paper-policy/checklist materials'], 'upstream_pin': 'd67bf46aa3a0176847a2749ce84e99d556021f20', 'translated_contract': 'paper context in; anchored immutable sections out; never invent evidence'})
+            entry.update({'adaptation': 'HowHow D1/D2 content, figure/table, and review-contract translation; no copied code or substantial text', 'inspected_upstream_files': ['paper-writing skill/index', 'paper-policy/checklist materials', 'paper-figures-tables methods'], 'upstream_pin': 'd67bf46aa3a0176847a2749ce84e99d556021f20', 'translated_contract': 'paper context in; anchored sections and provenance manifests out; never invent evidence or metrics'})
+        if entry['name'] == 'latex-arxiv-SKILL':
+            entry.update({'adaptation': 'HowHow D2 clean-room compile, citation-preserving refinement, typed issue execution, and package-QA translation; no copied code', 'inspected_upstream_files': ['latex build workflow', 'citation and source-package checks'], 'upstream_pin': '349ce88a0797422911a4ce58ed335842e9b87e15', 'translated_contract': 'approved plan before prose; deterministic compile and extracted archive QA; no venue submission; MIT/IEEEtran boundaries preserved'})
     value = {'schema_version': 1, 'lineage': 'wanshuiyin ARIS is current upstream authority; Randall ARIS is an older fork/compatibility snapshot', 'integrations': entries}
     atomic_json(root / '.howhow/integration-manifest.json', value)
-    atomic_json(root / 'integrations-manifest.json', value)
 
 def capabilities(root):
     manifest = root / '.howhow/integration-manifest.json'
@@ -170,7 +171,7 @@ def vnext_audit(root):
                 if not item.get('howhow_contract') or not item.get('artifact') or not item.get('limitations'): issues.append(str(name) + ': incomplete concrete contract')
                 if item.get('live_status') != 'NOT_CALLED': issues.append(str(name) + ': live boundary violated')
             duplicate = root / 'integrations-manifest.json'
-            if duplicate.exists() and duplicate.read_bytes() != manifest.read_bytes(): issues.append('duplicate root integration manifest differs')
+            if duplicate.exists(): issues.append('duplicate root integration manifest is forbidden; use .howhow/integration-manifest.json')
         except (OSError, ValueError, TypeError):
             issues.append('integration manifest unreadable')
     for folder in ('briefs', 'ideas', 'rankings', 'selections', 'targets'):

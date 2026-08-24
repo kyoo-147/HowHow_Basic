@@ -869,9 +869,9 @@ def build_paper(root: Path, strict: bool = False) -> dict[str, Any]:
             raise SystemExit(result["error"])
         return result
     commands = [[pdflatex, "-no-shell-escape", "-interaction=nonstopmode", "-halt-on-error", "main.tex"]]
-    if "\\bibliography{" in tex.read_text(encoding="utf-8") and bibtex:
+    if "\\bibliography{" in tex.read_text(encoding="utf-8") and re.search(r"\\cite\w*", tex.read_text(encoding="utf-8")) and bibtex:
         commands += [[bibtex, "main"], [pdflatex, "-no-shell-escape", "-interaction=nonstopmode", "-halt-on-error", "main.tex"], [pdflatex, "-no-shell-escape", "-interaction=nonstopmode", "-halt-on-error", "main.tex"]]
-    elif "\\bibliography{" in tex.read_text(encoding="utf-8"):
+    elif "\\bibliography{" in tex.read_text(encoding="utf-8") and re.search(r"\\cite\w*", tex.read_text(encoding="utf-8")):
         result = {"build_id": build_id, "passed": False, "error": "bibtex not installed", "engine": pdflatex}
         atomic_json(build / "manifest.json", result)
         fail_record(root, "latex_build", result["error"])
@@ -909,7 +909,7 @@ def _rebuild_extracted_package(extracted: Path) -> dict[str, Any]:
         return {"passed": False, "commands": [], "error": "pdflatex not installed for clean-room rebuild"}
     tex_text = tex.read_text(encoding="utf-8")
     commands = [[pdflatex, "-no-shell-escape", "-interaction=nonstopmode", "-halt-on-error", "main.tex"]]
-    if "\\bibliography{" in tex_text:
+    if "\\bibliography{" in tex_text and re.search(r"\\cite\w*", tex_text):
         bibtex = _tool("bibtex")
         if not bibtex:
             return {"passed": False, "commands": commands, "error": "bibtex not installed for clean-room rebuild"}
@@ -967,11 +967,20 @@ def validate_package(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
 
 
 def package_paper(root: Path, strict: bool = False) -> dict[str, Any]:
+    # D2 policy restrictions are a bundling gate, not a publication verdict.
+    from .d2 import policy_audit
+    policy_result = policy_audit(root)
+    if strict and not policy_result["passed"]:
+        raise SystemExit("source package blocked by policy/license inventory: " + ", ".join(policy_result.get("blockers", [])))
     paper = root / "paper"
     files = [(p, p.relative_to(paper).as_posix()) for p in paper.rglob("*") if p.is_file() and not p.is_symlink() and p.suffix not in {".aux", ".log", ".bbl", ".blg", ".fls", ".fdb_latexmk", ".synctex.gz"}]
     supplement = [root / "run_benchmark.py", root / "generate_assets.py", root / "data/corpus.txt"]
     supplement += sorted((root / ".howhow/experiments").glob("*.json"))
     supplement += sorted((root / ".howhow/sources/records").glob("*.json"))
+    supplement += sorted((root / ".howhow/artifacts").glob("*.json"))
+    supplement += sorted((root / ".howhow/citations").glob("*.json"))
+    supplement += sorted((root / ".howhow/issues").glob("*.json"))
+    supplement += sorted((root / ".howhow/policies").glob("*.json"))
     files += [(p, p.relative_to(root).as_posix()) for p in supplement if p.is_file() and not p.is_symlink()]
     if not (paper / "main.tex").exists() or not (paper / "references.bib").exists():
         raise SystemExit("package requires main.tex and references.bib")
@@ -1029,6 +1038,13 @@ def verify_project(root: Path, strict: bool = False, profile: str = "project") -
     check("latex", paper_result["passed"], paper_result.get("error", paper_result.get("pdf", "")))
     package = package_paper(root, strict=False) if paper_result["passed"] else {"files": []}
     check("package", bool(package.get("files")) and package.get("validation", {}).get("passed", False) and (root / "dist/arxiv-source.tar.gz").exists(), f"{len(package.get('files', []))} package files")
+    if profile == "vnext-detailed":
+        from .d2 import d2_audit
+        from .paper import audit as audit_paper
+        d2_result = d2_audit(root, required=True)
+        content_result = audit_paper(root)
+        check("d1_substantive_content", content_result["passed"], "anchored substantive paper content")
+        check("d2_detailed", d2_result["passed"], "required immutable artifacts, citations, issues and policy inventory")
     passed = all(item["passed"] for item in checks)
     verdict = "READY_FOR_HUMAN_REVIEW" if passed else "BLOCKED"
     report = {"schema_version": SCHEMA_VERSION, "profile": profile, "verdict": verdict, "checks": checks, "generated_at": now(), "human_review_required": True, "automatic_publication": False}
